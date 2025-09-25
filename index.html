@@ -235,11 +235,7 @@
 
   function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus("Cleared."); }
   function clearFiles(){ ["file-hl","file-fitbit","file-trib"].forEach(id=>{const el=document.getElementById(id); if (el) el.value="";}); setStatus("Cleared chosen files. (Nothing was uploaded.)"); }
-
-  function scrollToPlots(){
-    const card = document.querySelector('.card.plots'); if (!card) return;
-    card.scrollIntoView({behavior:'smooth', block:'start'});
-  }
+  function scrollToPlots(){ const card=document.querySelector('.card.plots'); if (card) card.scrollIntoView({behavior:'smooth', block:'start'}); }
 
   /* ============================ Quick X/Y ============================ */
   function parseSeries(text){ if (!text) return []; return toNumberArray(text.replace(/[;,\t\r\n]+/g," ").trim().split(/\s+/)); }
@@ -270,47 +266,85 @@
     setStatus("Rendered custom connected line."); scrollToPlots();
   };
 
-  /* ======================= Hare–Lynx (phase/return) ======================= */
+  /* ================== Hare–Lynx (phase/return) — FIXED ================== */
   document.getElementById("btn-make-lynx").onclick = function () {
     flash(this);
     const f = document.getElementById("file-hl").files[0];
     if (!f) return setStatus("Upload a hare–lynx CSV first.", true);
+
     readCSV(f, rows => {
+      // flexible headers
       const colYear = pickColumn(rows, ["Year","year","YEAR","date","yr"], {fallbackNumeric:true});
       const colHare = pickColumn(rows, ["Hare","hare","prey","hares","harecount"], {fallbackNumeric:true});
       const colLynx = pickColumn(rows, ["Lynx","lynx","predator","lynxcount"], {fallbackNumeric:true});
       if (!colYear || !colHare || !colLynx) return setStatus("Couldn’t find Year/Hare/Lynx columns.", true);
 
-      const year = toNumberArray(rows.map(r=>r[colYear]));
-      const hare = toNumberArray(rows.map(r=>r[colHare]));
-      const lynx = toNumberArray(rows.map(r=>r[colLynx]));
-      const n = Math.min(year.length, hare.length, lynx.length);
-      if (n < 3) return setStatus("Need ≥ 3 numeric rows.", true);
+      // clean + sort by year (prevents zigzags/teleport line)
+      let T = rows.map(r => ({
+        year: toNumber(r[colYear]),
+        hare: toNumber(r[colHare]),
+        lynx: toNumber(r[colLynx]),
+      })).filter(r => r.year!==null && r.hare!==null && r.lynx!==null);
+      T.sort((a,b) => a.year - b.year);
+      if (T.length < 3) return setStatus("Need ≥ 3 numeric rows.", true);
 
-      Plotly.newPlot("plot2",
-        [{x:hare.slice(0,n), y:lynx.slice(0,n), mode:"lines+markers", type:"scatter"}],
-        baseLayout("Phase Plane: Hare vs Lynx", {xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Lynx(t)"}}}),
+      const year = T.map(r=>r.year);
+      const hare = T.map(r=>r.hare);
+      const lynx = T.map(r=>r.lynx);
+
+      // phase plane with time-colored markers
+      const idx = year.map((_,i)=>i);
+      const phaseLine = { x:hare, y:lynx, mode:"lines", type:"scatter", line:{width:1.8}, name:"path" };
+      const phasePts  = { x:hare, y:lynx, mode:"markers", type:"scatter",
+                          marker:{ size:6, color:idx, colorscale:"Blues", colorbar:{title:"Order"} },
+                          name:"time" };
+
+      Plotly.newPlot("plot2", [phaseLine, phasePts],
+        baseLayout("Phase Plane: Hare vs Lynx", {
+          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s" },
+          yaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s" }
+        }),
         config
       );
 
-      const ht=hare.slice(0,n-1), ht1=hare.slice(1,n);
-      const lt=lynx.slice(0,n-1), lt1=lynx.slice(1,n);
-      const diag=(x,y)=>({x:[Math.min(...x,...y),Math.max(...x,...y)], y:[Math.min(...x,...y),Math.max(...x,...y)],
-                          mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false});
+      // return maps
+      const ht = hare.slice(0,-1), ht1 = hare.slice(1);
+      const lt = lynx.slice(0,-1), lt1 = lynx.slice(1);
+      const diag = (x,y)=>({
+        x:[Math.min(...x,...y), Math.max(...x,...y)],
+        y:[Math.min(...x,...y), Math.max(...x,...y)],
+        mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false
+      });
 
       Plotly.newPlot("plot3",
         [{x:ht, y:ht1, mode:"markers", type:"scatter", name:"Hare"}, diag(ht,ht1)],
-        baseLayout("Return: Hare(t) → Hare(t+1)", {xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Hare(t+1)"}}}),
+        baseLayout("Return: Hare(t) → Hare(t+1)", {
+          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s" },
+          yaxis:{ title:{text:"Hare(t+1)"}, tickformat:",~s" }
+        }),
         config
       );
 
       Plotly.newPlot("plot4",
         [{x:lt, y:lt1, mode:"markers", type:"scatter", name:"Lynx"}, diag(lt,lt1)],
-        baseLayout("Return: Lynx(t) → Lynx(t+1)", {xaxis:{title:{text:"Lynx(t)"}}, yaxis:{title:{text:"Lynx(t+1)"}}}),
+        baseLayout("Return: Lynx(t) → Lynx(t+1)", {
+          xaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s" },
+          yaxis:{ title:{text:"Lynx(t+1)"}, tickformat:",~s" }
+        }),
         config
       );
 
-      setStatus("Rendered phase plane and return maps."); scrollToPlots();
+      setStatus("Rendered phase plane and return maps (sorted by year).");
+      scrollToPlots();
+
+      // Optional: direction arrows (toggle by uncommenting)
+      // const N = Math.ceil(T.length / 6);
+      // const ann = [];
+      // for (let i = 0; i < T.length - 1; i += N) {
+      //   ann.push({ ax:hare[i], ay:lynx[i], x:hare[i+1], y:lynx[i+1],
+      //              arrowhead:3, arrowsize:1, arrowwidth:1, arrowcolor:"#7aa2ff", showarrow:true });
+      // }
+      // Plotly.relayout("plot2", { annotations: ann });
     });
   };
 
