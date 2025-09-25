@@ -14,13 +14,13 @@
     html, body { height: 100%; }
     body {
       margin:0;
-      height:100vh;                 /* lock viewport height */
-      overflow:hidden;              /* prevent page scroll */
+      height:100vh;
+      overflow:hidden;                       /* page doesn't scroll */
       background:#0b0c10; color:#e8e8e8;
       font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
     }
 
-    /* Header fixed at top */
+    /* Header fixed */
     header {
       height: var(--header-h);
       display:flex; flex-direction:column; justify-content:center;
@@ -31,14 +31,10 @@
     h1 { margin:0; font-size:20px; }
     .muted { color:#9aa3b2; font-size:12px; }
 
-    /* Main area fills remaining viewport; no scroll here */
-    .main {
-      height: calc(100vh - var(--header-h));
-      padding: var(--pad);
-      box-sizing: border-box;
-    }
+    /* Main fills remaining height */
+    .main { height: calc(100vh - var(--header-h)); padding: var(--pad); box-sizing: border-box; }
 
-    /* Grid: desktop → 2 columns; mobile → stacked */
+    /* Two-pane grid (controls fixed, plots scroll) */
     .wrap {
       height:100%;
       display:grid; gap:16px;
@@ -65,7 +61,7 @@
       background:#14161d; border:1px solid #1f2330; border-radius:12px;
       box-shadow:0 0 0 1px #0b0c10 inset;
       display:flex; flex-direction:column;
-      min-height:0; /* allow children to size with flex */
+      min-height:0;
     }
     .card h2 { font-size:16px; margin:0 0 8px; }
 
@@ -78,7 +74,7 @@
     button { cursor:pointer; transition: background .15s, border-color .15s, box-shadow .15s; }
     .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 
-    /* Controls column can scroll independently if it overflows */
+    /* Controls column can scroll if it overflows */
     .controls .inner {
       overflow:auto;
       padding: var(--pad);
@@ -86,31 +82,33 @@
       min-height:0;
     }
 
-    /* Plots: header row fixed; plots below scroll in their own pane */
+    /* Plots: toolbar fixed, plots pane scrolls */
     .plots .inner {
       padding: var(--pad);
       display:flex; flex-direction:column; gap:8px;
       height:100%; min-height:0;
     }
-    .toolbar {
-      display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
-    }
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
     .viewbar { display:inline-flex; gap:8px; align-items:center; }
     .viewbar button { width:auto; padding-inline:10px; }
 
-    .plots-scroll {
-      flex:1 1 auto;
-      overflow:auto;                 /* <-- the only scrollable area */
-      min-height:0;
-    }
+    .plots-scroll { flex:1 1 auto; overflow:auto; min-height:0; }
+
+    /* Plot grid & view modes */
     .row { display:grid; gap:16px; grid-template-columns:1fr 1fr; }
     .row.cols1 { grid-template-columns:1fr; }
     .row.cols2 { grid-template-columns:1fr 1fr; }
     .row.cols3 { grid-template-columns:1fr 1fr 1fr; }
+
+    /* Plots */
     .plot { min-height:520px; width:100%; }
     .row.cols1 .plot { min-height:640px; }
 
-    /* Titles & axes don’t clip */
+    /* Empty-slot treatment (shrinks empties & outlines) */
+    .plot.empty { min-height:48px !important; outline:1px dashed #1f2330; }
+    .row.cols1 .plot.empty { min-height:48px !important; }
+
+    /* Avoid clipped titles/axes */
     .js-plotly-plot .gtitle { white-space:normal !important; }
     .js-plotly-plot .main-svg { overflow:visible !important; }
 
@@ -126,12 +124,12 @@
 <body>
   <header>
     <h1>Coupled Oscillators — Interactive Charts</h1>
-    <div class="muted">Everything runs in your browser. Upload CSVs or paste numbers; use the View buttons; double-click any plot to fullscreen.</div>
+    <div class="muted">Header & controls stay fixed. Graphs have their own scroll area. Double-click a plot to fullscreen.</div>
   </header>
 
   <main class="main">
     <div class="wrap">
-      <!-- Controls (fixed pane) -->
+      <!-- Controls -->
       <div class="card controls">
         <div class="inner">
           <h2>Startup Box — Quick X/Y</h2>
@@ -179,19 +177,19 @@
               <button id="view-2" aria-pressed="true"  class="active">2-up</button>
               <button id="view-3" aria-pressed="false">3-up</button>
             </div>
-            <div class="muted">Double-click any plot for fullscreen (Esc to exit).</div>
+            <div class="muted">Use the camera icon on any chart to download a PNG.</div>
           </div>
 
           <div id="status" class="muted"></div>
 
           <div class="plots-scroll">
             <div class="row cols2" id="plot-row">
-              <div id="plot1" class="plot"></div>
-              <div id="plot2" class="plot"></div>
-              <div id="plot3" class="plot"></div>
-              <div id="plot4" class="plot"></div>
-              <div id="plot5" class="plot"></div>
-              <div id="plot6" class="plot"></div>
+              <div id="plot1" class="plot empty"></div>
+              <div id="plot2" class="plot empty"></div>
+              <div id="plot3" class="plot empty"></div>
+              <div id="plot4" class="plot empty"></div>
+              <div id="plot5" class="plot empty"></div>
+              <div id="plot6" class="plot empty"></div>
             </div>
           </div>
         </div>
@@ -200,7 +198,7 @@
   </main>
 
 <script>
-/* ====== sizing: keep header height in a CSS var (for consistency) ====== */
+/* ====== keep header height in a CSS var ====== */
 (function setHeaderHeight(){
   const h = document.querySelector('header');
   const apply = () => document.documentElement.style.setProperty('--header-h', h.getBoundingClientRect().height + 'px');
@@ -266,6 +264,28 @@ function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus(
 function clearFiles(){ ["file-hl","file-fitbit","file-trib"].forEach(id=>{const el=document.getElementById(id); if (el) el.value="";}); setStatus("Cleared chosen files. (Nothing was uploaded.)"); }
 function scrollToPlots(){ document.querySelector('.plots .plots-scroll').scrollTo({top:0, behavior:'smooth'}); }
 
+/* ====== filled-to-top behavior ====== */
+function reorderPlots() {
+  const row = document.getElementById('plot-row');
+  const nodes = Array.from(row.children);
+  nodes.sort((a,b)=> (a.classList.contains('empty')?1:0) - (b.classList.contains('empty')?1:0));
+  nodes.forEach(n => row.appendChild(n));
+}
+function markPlotted(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.classList.remove('empty');
+  reorderPlots();
+  scrollToPlots();
+}
+/* patch clearPlots to restore empty state + reorder */
+const _origClear = clearPlots;
+clearPlots = function(){
+  _origClear();
+  for(let i=1;i<=6;i++){ const el=document.getElementById('plot'+i); if(el) el.classList.add('empty'); }
+  reorderPlots();
+};
+
 /* ============================ Quick X/Y ============================ */
 function parseSeries(text){ if(!text) return []; return toNumberArray(text.replace(/[;,\t\r\n]+/g," ").trim().split(/\s+/)); }
 
@@ -276,8 +296,10 @@ document.getElementById("btn-scatter").onclick = function () {
   if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
   Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"markers",type:"scatter"}],
     baseLayout("Custom Scatter (X vs Y)", {xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}}}), config);
-  setStatus("Rendered custom scatter."); scrollToPlots();
+  markPlotted("plot1");
+  setStatus("Rendered custom scatter.");
 };
+
 document.getElementById("btn-line").onclick = function () {
   flash(this);
   const xs=parseSeries(document.getElementById("xvals").value);
@@ -285,7 +307,8 @@ document.getElementById("btn-line").onclick = function () {
   if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
   Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"lines+markers",type:"scatter"}],
     baseLayout("Custom Connected Line (X vs Y)", {xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}}}), config);
-  setStatus("Rendered custom connected line."); scrollToPlots();
+  markPlotted("plot1");
+  setStatus("Rendered custom connected line.");
 };
 
 /* ================== Hare–Lynx (phase/return) ================== */
@@ -312,6 +335,7 @@ document.getElementById("btn-make-lynx").onclick = function () {
     const phasePts ={x:hare,y:lynx,mode:"markers",type:"scatter",marker:{size:6,color:idx,colorscale:"Blues",colorbar:{title:"Order"}},name:"time"};
     Plotly.newPlot("plot2",[phaseLine,phasePts],
       baseLayout("Phase Plane: Hare vs Lynx",{xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Lynx(t)"}}}), config);
+    markPlotted("plot2");
 
     const ht=hare.slice(0,-1), ht1=hare.slice(1);
     const lt=lynx.slice(0,-1), lt1=lynx.slice(1);
@@ -319,11 +343,13 @@ document.getElementById("btn-make-lynx").onclick = function () {
 
     Plotly.newPlot("plot3", [{x:ht,y:ht1,mode:"markers",type:"scatter",name:"Hare"}, diag(ht,ht1)],
       baseLayout("Return: Hare(t) → Hare(t+1)",{xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Hare(t+1)"}}}), config);
+    markPlotted("plot3");
 
     Plotly.newPlot("plot4", [{x:lt,y:lt1,mode:"markers",type:"scatter",name:"Lynx"}, diag(lt,lt1)],
       baseLayout("Return: Lynx(t) → Lynx(t+1)",{xaxis:{title:{text:"Lynx(t)"}}, yaxis:{title:{text:"Lynx(t+1)"}}}), config);
+    markPlotted("plot4");
 
-    setStatus("Rendered phase plane and return maps."); scrollToPlots();
+    setStatus("Rendered phase plane and return maps.");
   });
 };
 
@@ -350,13 +376,15 @@ document.getElementById("btn-make-fitbit").onclick = function () {
     const theta=hours.map((_,i)=>(i+0.5)*(360/24));
     Plotly.newPlot("plot5", [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
       polarLayout("Nightingale Rose: Value by Hour"), config);
+    markPlotted("plot5");
 
     const means=dow.map((s,i)=> dowN[i]? s/dowN[i] : 0);
     const labels=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
     Plotly.newPlot("plot6", [{type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself"}],
       polarLayout("Radar: Mean by Day of Week"), config);
+    markPlotted("plot6");
 
-    setStatus("Rendered Nightingale rose and radar."); scrollToPlots();
+    setStatus("Rendered Nightingale rose and radar.");
   });
 };
 
@@ -398,7 +426,9 @@ document.getElementById("btn-make-trib").onclick = function () {
       traces.push({x:s.x,y:s.y,mode:"lines",line:{width:1},hoverinfo:"skip",showlegend:false});
 
     Plotly.newPlot("plot1", traces, baseLayout("Cobweb (quadratic fit) – Tribolium",{xaxis:{title:{text:"x(t)"}}, yaxis:{title:{text:"x(t+1)"}}}), config);
-    setStatus("Rendered cobweb diagram."); scrollToPlots();
+    markPlotted("plot1");
+
+    setStatus("Rendered cobweb diagram.");
   });
 };
 
@@ -409,9 +439,9 @@ const btnV2=document.getElementById("view-2");
 const btnV3=document.getElementById("view-3");
 const viewBtns=[btnV1,btnV2,btnV3];
 function setCols(n){ rowEl.classList.remove("cols1","cols2","cols3"); rowEl.classList.add(`cols${n}`); }
-btnV1.onclick=()=>{ setCols(1); setActive(btnV1,viewBtns); };
-btnV2.onclick=()=>{ setCols(2); setActive(btnV2,viewBtns); };
-btnV3.onclick=()=>{ setCols(3); setActive(btnV3,viewBtns); };
+btnV1.onclick=()=>{ setCols(1); setActive(btnV1,viewBtns); reorderPlots(); };  /* keep filled at top after mode switch */
+btnV2.onclick=()=>{ setCols(2); setActive(btnV2,viewBtns); reorderPlots(); };
+btnV3.onclick=()=>{ setCols(3); setActive(btnV3,viewBtns); reorderPlots(); };
 setCols(2); setActive(btnV2,viewBtns);
 
 function makeFullscreenable(id){ const el=document.getElementById(id); el.addEventListener("dblclick",()=>openFullscreen(id)); }
@@ -437,5 +467,4 @@ document.getElementById("btn-clear-files").onclick=function(){ flash(this); clea
 </script>
 </body>
 </html>
-
 
