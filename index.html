@@ -23,22 +23,42 @@
     textarea { min-height: 80px; resize: vertical; }
     button { cursor: pointer; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .muted { color: #9aa3b2; font-size: 12px; }
 
-    /* Plot grid: 1 column on small screens, 2 columns on medium, 3 on big */
-    .row { display: grid; gap: 16px; grid-template-columns: 1fr; }
-    @media (min-width: 900px)  { .wrap { grid-template-columns: 340px 1fr; } .row { grid-template-columns: 1fr 1fr; } }
-    @media (min-width: 1280px) { .wrap { grid-template-columns: 360px 1fr; } .row { grid-template-columns: 1fr 1fr 1fr; } }
+    /* Plot grid + view modes */
+    .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; } /* default: 2-up */
+    .row.cols1 { grid-template-columns: 1fr; }
+    .row.cols2 { grid-template-columns: 1fr 1fr; }
+    .row.cols3 { grid-template-columns: 1fr 1fr 1fr; }
 
     /* Plot containers */
-    .plot { min-height: 460px; width: 100%; }
+    .plot { min-height: 520px; width: 100%; }
 
-    /* Make long titles wrap instead of clipping */
+    /* Taller plots when single-column */
+    .row.cols1 .plot { min-height: 640px; }
+
+    /* Make long titles wrap and prevent clipping */
     .js-plotly-plot .gtitle { white-space: normal !important; }
-
-    /* Let axes labels/margins breathe */
     .js-plotly-plot .main-svg { overflow: visible !important; }
 
-    .muted { color: #9aa3b2; font-size: 12px; }
+    /* Fullscreen overlay */
+    .fs-wrap {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(11,12,16,.98); padding: 10px;
+      display: grid; place-items: center;
+    }
+    .fs-inner { width: min(1200px, 95vw); height: min(90vh, 900px); }
+    .fs-close {
+      position: fixed; top: 10px; right: 12px;
+      background: #14161d; color: #e8e8e8; border: 1px solid #2b3245;
+      padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    }
+
+    /* Responsive columns on narrow screens */
+    @media (max-width: 900px) {
+      .wrap { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -63,7 +83,7 @@
       <hr style="border-color:#1f2330; margin:14px 0;">
 
       <h2>Upload CSVs</h2>
-      <label>Hare–Lynx CSV (headers flexible: Year/Hare/Lynx in any case)</label>
+      <label>Hare–Lynx CSV (headers flexible: Year/Hare/Lynx)</label>
       <input type="file" id="file-hl" accept=".csv"/>
       <label>Fitbit by-minute CSV (flexible: timestamp/time + steps/value)</label>
       <input type="file" id="file-fitbit" accept=".csv"/>
@@ -88,8 +108,16 @@
     <!-- Plots -->
     <div class="card">
       <h2>Figures</h2>
+      <div class="grid-2" style="margin-bottom:6px">
+        <div class="muted">View:
+          <button id="view-1">1-up</button>
+          <button id="view-2">2-up</button>
+          <button id="view-3">3-up</button>
+        </div>
+        <div class="muted" style="text-align:right">Double-click any plot to fullscreen (Esc to exit).</div>
+      </div>
       <div id="status" style="margin:8px 0; font:12px system-ui; color:#e3e7ef;"></div>
-      <div class="row">
+      <div class="row cols2" id="plot-row">
         <div id="plot1" class="plot"></div>
         <div id="plot2" class="plot"></div>
         <div id="plot3" class="plot"></div>
@@ -102,10 +130,7 @@
 
   <script>
   /* ==========================================================
-     Flexible CSV plotting utils + better layouts (single block)
-     Requires:
-       - Plotly   (already loaded)
-       - PapaParse (already loaded)
+     Flexible CSV plotting utils + layouts + view/fullscreen
      ========================================================== */
 
   const config = { responsive: true, displaylogo: false };
@@ -162,7 +187,7 @@
     return null;
   }
 
-  /* ---------- CSV reader (Papa auto-detects delimiter) ---------- */
+  /* ---------- CSV reader ---------- */
   function readCSV(file, cb){
     Papa.parse(file, {
       header: true, skipEmptyLines: true, dynamicTyping: false,
@@ -175,7 +200,7 @@
     });
   }
 
-  /* ---------- layout helpers (prevent clipped titles/labels) ---------- */
+  /* ---------- layout helpers ---------- */
   function baseLayout(titleText, extra = {}){
     return Object.assign({
       title: { text: titleText, x: 0.02, xanchor: "left", font: { size: 16 } },
@@ -206,7 +231,7 @@
   document.getElementById("btn-clear").onclick = clearPlots;
   document.getElementById("btn-clear-files").onclick = clearFiles;
 
-  /* ---------- Quick X/Y (startup box) ---------- */
+  /* ---------- Quick X/Y ---------- */
   function parseSeries(text){ if (!text) return []; return toNumberArray(text.replace(/[;,\t\r\n]+/g," ").trim().split(/\s+/)); }
 
   document.getElementById("btn-scatter").onclick = () => {
@@ -365,6 +390,53 @@
       setStatus("Rendered cobweb diagram.");
     });
   };
+
+  /* ---------- View mode buttons ---------- */
+  const rowEl = document.getElementById("plot-row");
+  function setCols(n){
+    rowEl.classList.remove("cols1","cols2","cols3");
+    rowEl.classList.add(`cols${n}`);
+  }
+  document.getElementById("view-1").onclick = () => setCols(1);
+  document.getElementById("view-2").onclick = () => setCols(2);
+  document.getElementById("view-3").onclick = () => setCols(3);
+
+  /* ---------- Double-click to fullscreen any plot ---------- */
+  function makeFullscreenable(plotId){
+    const el = document.getElementById(plotId);
+    el.addEventListener("dblclick", () => openFullscreen(plotId));
+  }
+  for (let i=1;i<=6;i++) makeFullscreenable("plot"+i);
+
+  let fsActive = null;
+  function openFullscreen(plotId){
+    if (fsActive) return;
+    const src = document.getElementById(plotId);
+    const wrap = document.createElement("div");
+    wrap.className = "fs-wrap";
+    wrap.innerHTML = `
+      <button class="fs-close" id="fs-close">Close (Esc)</button>
+      <div class="fs-inner"><div id="fs-plot"></div></div>
+    `;
+    document.body.appendChild(wrap);
+    fsActive = wrap;
+
+    // clone the existing plot (data + layout)
+    const gd = src;
+    const data = gd.data ? JSON.parse(JSON.stringify(gd.data)) : [];
+    const layout = gd.layout ? JSON.parse(JSON.stringify(gd.layout)) : {};
+    Plotly.newPlot("fs-plot", data, layout, {responsive:true, displaylogo:false});
+
+    document.getElementById("fs-close").onclick = closeFullscreen;
+    document.addEventListener("keydown", escClose);
+  }
+  function escClose(e){ if (e.key === "Escape") closeFullscreen(); }
+  function closeFullscreen(){
+    if (!fsActive) return;
+    document.removeEventListener("keydown", escClose);
+    fsActive.remove(); fsActive = null;
+  }
   </script>
 </body>
 </html>
+
