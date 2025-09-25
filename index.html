@@ -79,51 +79,119 @@
   </div>
 
 <script>
-const config = {responsive:true, displaylogo:false};
+/* ===========================
+   Flexible CSV plotting utils
+   =========================== */
 
-// ---------- helpers ----------
+const config = { responsive: true, displaylogo: false };
+
 function setStatus(msg, isError=false){
   const el = document.getElementById("status");
+  if (!el) return;
   el.style.color = isError ? "#ffb4b4" : "#cfd3dc";
   el.textContent = msg;
 }
 
-function parseSeries(text) {
-  if (!text) return [];
-  let t = text.replace(/[;,\t\r\n]+/g, " ").trim().split(/\s+/);
-  let out = [];
-  for (const s of t) { const v = parseFloat(s); if (!isNaN(v)) out.push(v); }
-  return out;
+/* Robust numeric parsing: strips thousands commas, spaces, %;
+   handles "1.2e3", "1 234", "1,234.5", "-3%", etc. */
+function toNumber(v) {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  let s = String(v).trim();
+  if (!s) return null;
+  // remove thousands separators/spaces
+  s = s.replace(/(?<=\d)[\s,](?=\d)/g, "");
+  // strip trailing percent (convert to fraction)
+  const isPct = /%$/.test(s);
+  s = s.replace(/%$/, "");
+  const n = Number(s);
+  if (!Number.isFinite(n)) return null;
+  return isPct ? n/100 : n;
 }
 
+function toNumberArray(arr) {
+  return arr.map(toNumber).filter(v => v !== null);
+}
+
+/* Timestamp parsing: ISO strings, Unix (s/ms), or Date-parsable strings */
+function toDate(val) {
+  if (val === null || val === undefined || val === "") return null;
+  if (val instanceof Date && !isNaN(val)) return val;
+  if (typeof val === "number") {
+    // treat >=1e12 as ms, >=1e9 as seconds
+    const ms = val >= 1e12 ? val : (val >= 1e9 ? val*1000 : val);
+    const d = new Date(ms);
+    return isNaN(d) ? null : d;
+  }
+  const s = String(val).trim();
+  // try plain Date
+  let d = new Date(s);
+  if (!isNaN(d)) return d;
+  // try common “YYYY/MM/DD HH:MM” (Safari-safe)
+  const s2 = s.replace(/-/g,'/'); d = new Date(s2);
+  return isNaN(d) ? null : d;
+}
+
+/* Header normalization & matching */
+function normKey(k) {
+  return String(k||"")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "") // remove spaces/punct
+    .trim();
+}
+
+// returns actual column name in rows[0] matching any alias in opts
+function pickColumn(rows, opts, {fallbackNumeric=false} = {}) {
+  if (!rows || !rows.length) return null;
+  const keyMap = {};
+  Object.keys(rows[0]).forEach(k => keyMap[normKey(k)] = k);
+
+  for (const opt of opts) {
+    const nk = normKey(opt);
+    if (nk in keyMap) return keyMap[nk];
+  }
+  if (fallbackNumeric) {
+    // choose first column that looks mostly numeric
+    const cols = Object.keys(rows[0]);
+    for (const c of cols) {
+      const vals = rows.slice(0, Math.min(30, rows.length)).map(r => toNumber(r[c]));
+      const ok = vals.filter(v => v !== null).length >= Math.ceil(vals.length * 0.6);
+      if (ok) return c;
+    }
+  }
+  return null;
+}
+
+/* CSV reader: Papa Parse auto-detects delimiter & quotes */
 function readCSV(file, cb) {
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
-    dynamicTyping: true,
+    dynamicTyping: false,  // we’ll coerce ourselves
     complete: results => {
       if (results.errors && results.errors.length) {
         setStatus("CSV parsed with warnings: " + results.errors[0].message, true);
       } else {
-        setStatus("Loaded " + file.name + " (" + results.data.length + " rows)");
+        setStatus(`Loaded ${file.name} (${results.data.length} rows)`);
       }
-      cb(results.data); // array of objects with keys from header row
+      cb(results.data); // array of objects
     },
     error: err => setStatus("CSV parse error: " + err, true)
   });
 }
 
-function toNumberArray(arr) {
-  return arr.map(v => {
-    if (typeof v === "string") v = v.replace(/,/g,"");
-    const n = parseFloat(v);
-    return Number.isNaN(n) ? null : n;
-  }).filter(v => v !== null);
+function clearPlots(){
+  for (let i=1;i<=6;i++) Plotly.purge("plot"+i);
+  setStatus("Cleared.");
 }
 
-function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus("Cleared."); }
+/* ---------- Quick X/Y from text boxes ---------- */
+function parseSeries(text) {
+  if (!text) return [];
+  let t = text.replace(/[;,\t\r\n]+/g, " ").trim().split(/\s+/);
+  return toNumberArray(t);
+}
 
-// ---------- Quick X/Y ----------
 document.getElementById("btn-scatter").onclick = () => {
   const xs = parseSeries(document.getElementById("xvals").value);
   const ys = parseSeries(document.getElementById("yvals").value);
@@ -142,47 +210,60 @@ document.getElementById("btn-line").onclick = () => {
   setStatus("Rendered custom connected line.");
 };
 
-// ---------- Hare–Lynx: Phase + Returns ----------
+/* ---------- Hare–Lynx: Phase plane + Return maps ---------- */
 document.getElementById("btn-make-lynx").onclick = () => {
   const f = document.getElementById("file-hl").files[0];
-  if (!f) return setStatus("Upload hare_lynx.csv first.", true);
+  if (!f) return setStatus("Upload a hare–lynx CSV first.", true);
   readCSV(f, (rows) => {
-    const year = toNumberArray(rows.map(r => r["Year"]));
-    const hare = toNumberArray(rows.map(r => r["Hare"]));
-    const lynx = toNumberArray(rows.map(r => r["Lynx"]));
-    if (hare.length < 3 || lynx.length < 3 || year.length !== hare.length || hare.length !== lynx.length) {
-      setStatus("Need ≥ 3 rows with headers Year,Hare,Lynx.", true); return;
-    }
-    Plotly.newPlot("plot2", [{x: hare, y: lynx, mode: "lines+markers", type: "scatter"}],
+    const colYear = pickColumn(rows, ["Year","year","YEAR","date","yr"], {fallbackNumeric:true});
+    const colHare = pickColumn(rows, ["Hare","hare","prey","hares","harecount"], {fallbackNumeric:true});
+    const colLynx = pickColumn(rows, ["Lynx","lynx","predator","lynxcount"], {fallbackNumeric:true});
+    if (!colYear || !colHare || !colLynx) { setStatus("Couldn’t find Year/Hare/Lynx columns.", true); return; }
+
+    const year = toNumberArray(rows.map(r => r[colYear]));
+    const hare = toNumberArray(rows.map(r => r[colHare]));
+    const lynx = toNumberArray(rows.map(r => r[colLynx]));
+    const n = Math.min(year.length, hare.length, lynx.length);
+    if (n < 3) { setStatus("Need ≥ 3 numeric rows.", true); return; }
+
+    Plotly.newPlot("plot2", [{x: hare.slice(0,n), y: lynx.slice(0,n), mode: "lines+markers", type: "scatter"}],
       {title:"Phase Plane: Hare vs Lynx", xaxis:{title:"Hare(t)"}, yaxis:{title:"Lynx(t)"}}, config);
 
-    const ht=hare.slice(0,-1), ht1=hare.slice(1);
-    const lt=lynx.slice(0,-1), lt1=lynx.slice(1);
-    const diag1={x:[Math.min(...ht,...ht1),Math.max(...ht,...ht1)],y:[Math.min(...ht,...ht1),Math.max(...ht,...ht1)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false};
-    const diag2={x:[Math.min(...lt,...lt1),Math.max(...lt,...lt1)],y:[Math.min(...lt,...lt1),Math.max(...lt,...lt1)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false};
-    Plotly.newPlot("plot3", [{x:ht,y:ht1,mode:"markers",type:"scatter",name:"Hare"}, diag1],
+    const ht=hare.slice(0,n-1), ht1=hare.slice(1,n);
+    const lt=lynx.slice(0,n-1), lt1=lynx.slice(1,n);
+    const diag = (x,y)=>({x:[Math.min(...x,...y),Math.max(...x,...y)],y:[Math.min(...x,...y),Math.max(...x,...y)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false});
+    Plotly.newPlot("plot3", [{x:ht,y:ht1,mode:"markers",type:"scatter",name:"Hare"}, diag(ht,ht1)],
       {title:"Return: Hare(t) → Hare(t+1)", xaxis:{title:"Hare(t)"}, yaxis:{title:"Hare(t+1)"}}, config);
-    Plotly.newPlot("plot4", [{x:lt,y:lt1,mode:"markers",type:"scatter",name:"Lynx"}, diag2],
+    Plotly.newPlot("plot4", [{x:lt,y:lt1,mode:"markers",type:"scatter",name:"Lynx"}, diag(lt,lt1)],
       {title:"Return: Lynx(t) → Lynx(t+1)", xaxis:{title:"Lynx(t)"}, yaxis:{title:"Lynx(t+1)"}}, config);
 
     setStatus("Rendered phase plane and return maps.");
   });
 };
 
-// ---------- Fitbit: Rose + Radar ----------
+/* ---------- Fitbit: Nightingale Rose + Radar ---------- */
 document.getElementById("btn-make-fitbit").onclick = () => {
   const f = document.getElementById("file-fitbit").files[0];
-  if (!f) return setStatus("Upload fitbit_byminute.csv first.", true);
+  if (!f) return setStatus("Upload a Fitbit/time CSV first.", true);
   readCSV(f, (rows) => {
+    // Accept flexible headers
+    const colTime  = pickColumn(rows, ["timestamp","time","datetime","date","ActivityMinute"], {fallbackNumeric:false});
+    const colSteps = pickColumn(rows, ["steps","value","count","activity","stepcount","Steps"], {fallbackNumeric:true});
+    if (!colTime || !colSteps) { setStatus("Couldn’t find time & steps columns.", true); return; }
+
     const hours = new Array(24).fill(0), dow = new Array(7).fill(0), dowN = new Array(7).fill(0);
+    let valid = 0;
     for (const r of rows) {
-      const ts = new Date(r["timestamp"]);
-      if (isNaN(ts)) continue;
-      const st = (r["steps"]!==undefined && r["steps"]!==null) ? parseFloat((r["steps"]+"").replace(/,/g,"")) : 0;
-      const v = Number.isNaN(st) ? 0 : st;
-      hours[ts.getHours()] += v;
-      const d = (ts.getDay()+6)%7; dow[d] += v; dowN[d] += 1; // Mon=0
+      const d = toDate(r[colTime]);
+      if (!d) continue;
+      const st = toNumber(r[colSteps]); if (st === null) continue;
+      valid++;
+      hours[d.getHours()] += st;
+      dow[(d.getDay()+6)%7] += st; // Mon=0
+      dowN[(d.getDay()+6)%7] += 1;
     }
+    if (!valid) { setStatus("No valid timestamps/steps found.", true); return; }
+
     const theta = hours.map((_, i) => (i+0.5) * (360/24));
     Plotly.newPlot("plot5", [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
       {title:"Nightingale Rose: Steps by Hour", polar:{angularaxis:{direction:"clockwise"}}}, config);
@@ -196,14 +277,20 @@ document.getElementById("btn-make-fitbit").onclick = () => {
   });
 };
 
-// ---------- Tribolium: Cobweb ----------
+/* ---------- Tribolium: Cobweb (quadratic map fit) ---------- */
 document.getElementById("btn-make-trib").onclick = () => {
   const f = document.getElementById("file-trib").files[0];
-  if (!f) return setStatus("Upload tribolium.csv first.", true);
+  if (!f) return setStatus("Upload a Tribolium CSV first.", true);
   readCSV(f, (rows) => {
-    const A = toNumberArray(rows.map(r => r["Adults"]));
-    if (A.length < 3) { setStatus("Need ≥ 3 rows with headers t,Adults.", true); return; }
-    const x = A.slice(0, -1), y = A.slice(1);
+    const colT   = pickColumn(rows, ["t","time","step","index"], {fallbackNumeric:true});
+    const colVal = pickColumn(rows, ["adults","count","population","value","n"], {fallbackNumeric:true});
+    if (!colT || !colVal) { setStatus("Couldn’t find t & Adults columns.", true); return; }
+
+    // Build x(t), x(t+1) from the series (ignore t values; use order)
+    const series = toNumberArray(rows.map(r => r[colVal]));
+    if (series.length < 3) { setStatus("Need ≥ 3 numeric rows.", true); return; }
+    const x  = series.slice(0, -1);
+    const y  = series.slice(1);
 
     // Quadratic fit via normal equations
     const n=x.length;
