@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>BISC 643 – Clocks & Calendars (Interactive)</title>
+  <title>Coupled Oscillators — Interactive Charts</title>
 
   <!-- Libraries -->
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
@@ -11,65 +11,69 @@
 
   <style>
     :root { --pad: 14px; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0c10; color: #e8e8e8; }
-    header { padding: var(--pad); border-bottom: 1px solid #222; background: #111217; position: sticky; top: 0; z-index: 10; }
-    h1 { margin: 0 0 6px; font-size: 20px; }
-    .wrap { display: grid; gap: 16px; grid-template-columns: 360px 1fr; padding: var(--pad); }
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; margin:0; background:#0b0c10; color:#e8e8e8; }
+    header { padding:var(--pad); border-bottom:1px solid #222; background:#111217; position:sticky; top:0; z-index:10; }
+    h1 { margin:0 0 6px; font-size:20px; }
+    .card { background:#14161d; border:1px solid #1f2330; border-radius:12px; padding:var(--pad); box-shadow:0 0 0 1px #0b0c10 inset; }
+    .card h2 { font-size:16px; margin:0 0 8px; }
+    label { display:block; font-size:12px; margin-bottom:6px; color:#cfd3dc; }
+    textarea,input,button { width:100%; box-sizing:border-box; font:inherit; padding:8px; border-radius:8px; border:1px solid #2b3245; background:#0f1117; color:#e8e8e8; }
+    textarea { min-height:80px; resize:vertical; }
+    button { cursor:pointer; }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .muted { color:#9aa3b2; font-size:12px; }
 
-    .card { background: #14161d; border: 1px solid #1f2330; border-radius: 12px; padding: var(--pad); box-shadow: 0 0 0 1px #0b0c10 inset; }
-    .card h2 { font-size: 16px; margin: 0 0 8px; }
-    label { display: block; font-size: 12px; margin-bottom: 6px; color: #cfd3dc; }
-    textarea, input, button { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid #2b3245; background: #0f1117; color: #e8e8e8; }
-    textarea { min-height: 80px; resize: vertical; }
-    button { cursor: pointer; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .muted { color: #9aa3b2; font-size: 12px; }
-
-    /* Plot grid + view modes */
-    .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; } /* default: 2-up */
-    .row.cols1 { grid-template-columns: 1fr; }
-    .row.cols2 { grid-template-columns: 1fr 1fr; }
-    .row.cols3 { grid-template-columns: 1fr 1fr 1fr; }
-
-    /* Plot containers */
-    .plot { min-height: 520px; width: 100%; }
-
-    /* Taller plots when single-column */
-    .row.cols1 .plot { min-height: 640px; }
-
-    /* Make long titles wrap and prevent clipping */
-    .js-plotly-plot .gtitle { white-space: normal !important; }
-    .js-plotly-plot .main-svg { overflow: visible !important; }
-
-    /* Fullscreen overlay */
-    .fs-wrap {
-      position: fixed; inset: 0; z-index: 9999;
-      background: rgba(11,12,16,.98); padding: 10px;
-      display: grid; place-items: center;
+    /* --- layout: controls + plots; plots first on mobile --- */
+    .wrap {
+      display:grid; gap:16px;
+      grid-template-areas:"controls plots";
+      grid-template-columns:360px 1fr;
+      padding:var(--pad);
     }
-    .fs-inner { width: min(1200px, 95vw); height: min(90vh, 900px); }
-    .fs-close {
-      position: fixed; top: 10px; right: 12px;
-      background: #14161d; color: #e8e8e8; border: 1px solid #2b3245;
-      padding: 8px 10px; border-radius: 8px; cursor: pointer;
-    }
-
-    /* Responsive columns on narrow screens */
+    .controls { grid-area:controls; }
+    .plots    { grid-area:plots; }
     @media (max-width: 900px) {
-      .wrap { grid-template-columns: 1fr; }
-      .row { grid-template-columns: 1fr; }
+      .wrap {
+        grid-template-areas:
+          "plots"
+          "controls";
+        grid-template-columns:1fr;
+      }
     }
+
+    /* --- view toolbar row --- */
+    .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
+    .toolbar .viewbar { display:inline-flex; gap:8px; align-items:center; }
+    .toolbar .viewbar button { width:auto; padding-inline:10px; }
+    .toolbar .tip { text-align:right; }
+
+    /* --- plot grid + view modes --- */
+    .row { display:grid; gap:16px; grid-template-columns:1fr 1fr; } /* default 2-up */
+    .row.cols1 { grid-template-columns:1fr; }
+    .row.cols2 { grid-template-columns:1fr 1fr; }
+    .row.cols3 { grid-template-columns:1fr 1fr 1fr; }
+    .plot { min-height:520px; width:100%; }
+    .row.cols1 .plot { min-height:640px; }
+
+    /* wrap long titles + prevent clipping */
+    .js-plotly-plot .gtitle { white-space:normal !important; }
+    .js-plotly-plot .main-svg { overflow:visible !important; }
+
+    /* --- fullscreen overlay --- */
+    .fs-wrap { position:fixed; inset:0; z-index:9999; background:rgba(11,12,16,.98); padding:10px; display:grid; place-items:center; }
+    .fs-inner { width:min(1200px,95vw); height:min(90vh,900px); }
+    .fs-close { position:fixed; top:10px; right:12px; background:#14161d; color:#e8e8e8; border:1px solid #2b3245; padding:8px 10px; border-radius:8px; cursor:pointer; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Clocks & Calendars — Interactive Charts</h1>
+    <h1>Coupled Oscillators — Interactive Charts</h1>
     <div class="muted">Paste X/Y or upload CSVs. Nothing uploads to a server—everything runs in your browser.</div>
   </header>
 
   <div class="wrap">
     <!-- Controls -->
-    <div class="card">
+    <div class="card controls">
       <h2>Startup Box — Quick X/Y</h2>
       <label>X values (comma/space/newline-separated)</label>
       <textarea id="xvals" placeholder="e.g., 1, 2, 3, 4"></textarea>
@@ -106,17 +110,21 @@
     </div>
 
     <!-- Plots -->
-    <div class="card">
+    <div class="card plots">
       <h2>Figures</h2>
-      <div class="grid-2" style="margin-bottom:6px">
-        <div class="muted">View:
+
+      <div class="toolbar">
+        <div class="viewbar">
+          <span class="muted">View:</span>
           <button id="view-1">1-up</button>
           <button id="view-2">2-up</button>
           <button id="view-3">3-up</button>
         </div>
-        <div class="muted" style="text-align:right">Double-click any plot to fullscreen (Esc to exit).</div>
+        <div class="muted tip">Double-click any plot to fullscreen (Esc to exit).</div>
       </div>
+
       <div id="status" style="margin:8px 0; font:12px system-ui; color:#e3e7ef;"></div>
+
       <div class="row cols2" id="plot-row">
         <div id="plot1" class="plot"></div>
         <div id="plot2" class="plot"></div>
@@ -129,13 +137,10 @@
   </div>
 
   <script>
-  /* ==========================================================
-     Flexible CSV plotting utils + layouts + view/fullscreen
-     ========================================================== */
+  /* ============================ helpers ============================ */
 
   const config = { responsive: true, displaylogo: false };
 
-  /* ---------- status ---------- */
   function setStatus(msg, isError=false){
     const el = document.getElementById("status");
     if (!el) return;
@@ -143,95 +148,86 @@
     el.textContent = msg;
   }
 
-  /* ---------- number/time parsing ---------- */
-  function toNumber(v) {
+  function toNumber(v){
     if (v === null || v === undefined) return null;
     if (typeof v === "number" && Number.isFinite(v)) return v;
-    let s = String(v).trim();
-    if (!s) return null;
-    s = s.replace(/(?<=\d)[\s,](?=\d)/g, "");   // remove thousands spaces/commas
-    const isPct = /%$/.test(s);                 // handle percents
-    s = s.replace(/%$/, "");
-    const n = Number(s);
-    if (!Number.isFinite(n)) return null;
+    let s = String(v).trim(); if (!s) return null;
+    s = s.replace(/(?<=\d)[\s,](?=\d)/g,"");
+    const isPct=/%$/.test(s); s=s.replace(/%$/,"");
+    const n=Number(s); if (!Number.isFinite(n)) return null;
     return isPct ? n/100 : n;
   }
-  function toNumberArray(arr){ return arr.map(toNumber).filter(v => v !== null); }
+  const toNumberArray = arr => arr.map(toNumber).filter(v=>v!==null);
 
   function toDate(val){
-    if (val === null || val === undefined || val === "") return null;
+    if (val===null || val===undefined || val==="") return null;
     if (val instanceof Date && !isNaN(val)) return val;
-    if (typeof val === "number") {              // unix s / ms
+    if (typeof val === "number"){
       const ms = val >= 1e12 ? val : (val >= 1e9 ? val*1000 : val);
       const d = new Date(ms); return isNaN(d) ? null : d;
     }
     const s = String(val).trim();
-    let d = new Date(s);
-    if (!isNaN(d)) return d;
-    d = new Date(s.replace(/-/g,'/'));          // Safari-safe
-    return isNaN(d) ? null : d;
+    let d = new Date(s); if (!isNaN(d)) return d;
+    d = new Date(s.replace(/-/g,'/')); return isNaN(d) ? null : d;
   }
 
-  /* ---------- header matching ---------- */
   function normKey(k){ return String(k||"").toLowerCase().replace(/[^a-z0-9]+/g,"").trim(); }
   function pickColumn(rows, opts, {fallbackNumeric=false} = {}){
     if (!rows || !rows.length) return null;
-    const keyMap = {}; Object.keys(rows[0]).forEach(k => keyMap[normKey(k)] = k);
-    for (const opt of opts){ const nk = normKey(opt); if (nk in keyMap) return keyMap[nk]; }
+    const keyMap = {}; Object.keys(rows[0]).forEach(k=> keyMap[normKey(k)] = k);
+    for (const opt of opts){ const nk=normKey(opt); if (nk in keyMap) return keyMap[nk]; }
     if (fallbackNumeric){
       for (const c of Object.keys(rows[0])){
-        const vals = rows.slice(0, Math.min(30, rows.length)).map(r => toNumber(r[c]));
-        if (vals.filter(v => v !== null).length >= Math.ceil(vals.length * 0.6)) return c;
+        const vals = rows.slice(0, Math.min(30, rows.length)).map(r=>toNumber(r[c]));
+        if (vals.filter(v=>v!==null).length >= Math.ceil(vals.length*0.6)) return c;
       }
     }
     return null;
   }
 
-  /* ---------- CSV reader ---------- */
   function readCSV(file, cb){
     Papa.parse(file, {
-      header: true, skipEmptyLines: true, dynamicTyping: false,
-      complete: res => { 
-        if (res.errors?.length) setStatus("CSV warnings: " + res.errors[0].message, true);
+      header:true, skipEmptyLines:true, dynamicTyping:false,
+      complete: res => {
+        if (res.errors?.length) setStatus("CSV warnings: "+res.errors[0].message, true);
         else setStatus(`Loaded ${file.name} (${res.data.length} rows)`);
         cb(res.data);
       },
-      error: err => setStatus("CSV parse error: " + err, true)
+      error: err => setStatus("CSV parse error: "+err, true)
     });
   }
 
-  /* ---------- layout helpers ---------- */
-  function baseLayout(titleText, extra = {}){
+  function baseLayout(titleText, extra={}){
     return Object.assign({
-      title: { text: titleText, x: 0.02, xanchor: "left", font: { size: 16 } },
-      margin: { t: 60, r: 30, b: 60, l: 70 },
-      xaxis: { title: { text: "" }, automargin: true, tickfont: { size: 11 }, titlefont: { size: 12 } },
-      yaxis: { title: { text: "" }, automargin: true, tickfont: { size: 11 }, titlefont: { size: 12 } },
-      hoverlabel: { font: { size: 11 } }
+      title:{ text:titleText, x:0.02, xanchor:"left", font:{size:16}},
+      margin:{ t:60, r:30, b:60, l:70 },
+      xaxis:{ title:{text:""}, automargin:true, tickfont:{size:11}, titlefont:{size:12} },
+      yaxis:{ title:{text:""}, automargin:true, tickfont:{size:11}, titlefont:{size:12} },
+      hoverlabel:{ font:{size:11} }
     }, extra);
   }
-  function polarLayout(titleText, extra = {}){
+  function polarLayout(titleText, extra={}){
     return Object.assign({
-      title: { text: titleText, x: 0.02, xanchor: "left", font: { size: 16 } },
-      margin: { t: 60, r: 30, b: 40, l: 30 },
-      polar: {
-        angularaxis: { direction: "clockwise", tickfont: { size: 11 } },
-        radialaxis:  { tickfont: { size: 11 }, angle: 0, ticks: "outside" }
-      },
-      hoverlabel: { font: { size: 11 } }
+      title:{ text:titleText, x:0.02, xanchor:"left", font:{size:16}},
+      margin:{ t:60, r:30, b:40, l:30 },
+      polar:{ angularaxis:{direction:"clockwise", tickfont:{size:11}},
+              radialaxis:{tickfont:{size:11}, angle:0, ticks:"outside"} },
+      hoverlabel:{ font:{size:11} }
     }, extra);
   }
 
-  /* ---------- utility buttons ---------- */
   function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus("Cleared."); }
-  function clearFiles(){
-    ["file-hl","file-fitbit","file-trib"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
-    setStatus("Cleared chosen files. (Nothing was ever uploaded.)");
-  }
+  function clearFiles(){ ["file-hl","file-fitbit","file-trib"].forEach(id=>{const el=document.getElementById(id); if (el) el.value="";}); setStatus("Cleared chosen files. (Nothing was uploaded.)"); }
+
   document.getElementById("btn-clear").onclick = clearPlots;
   document.getElementById("btn-clear-files").onclick = clearFiles;
 
-  /* ---------- Quick X/Y ---------- */
+  function scrollToPlots(){
+    const card = document.querySelector('.card.plots'); if (!card) return;
+    card.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  /* ============================ Quick X/Y ============================ */
   function parseSeries(text){ if (!text) return []; return toNumberArray(text.replace(/[;,\t\r\n]+/g," ").trim().split(/\s+/)); }
 
   document.getElementById("btn-scatter").onclick = () => {
@@ -239,11 +235,11 @@
     const ys = parseSeries(document.getElementById("yvals").value);
     if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
     Plotly.newPlot("plot1",
-      [{ x: xs, y: ys, mode: "markers", type: "scatter" }],
-      baseLayout("Custom Scatter (X vs Y)", { xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}} }),
+      [{x:xs,y:ys,mode:"markers",type:"scatter"}],
+      baseLayout("Custom Scatter (X vs Y)", {xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}}}),
       config
     );
-    setStatus("Rendered custom scatter.");
+    setStatus("Rendered custom scatter."); scrollToPlots();
   };
 
   document.getElementById("btn-line").onclick = () => {
@@ -251,14 +247,14 @@
     const ys = parseSeries(document.getElementById("yvals").value);
     if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
     Plotly.newPlot("plot1",
-      [{ x: xs, y: ys, mode: "lines+markers", type: "scatter" }],
-      baseLayout("Custom Connected Line (X vs Y)", { xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}} }),
+      [{x:xs,y:ys,mode:"lines+markers",type:"scatter"}],
+      baseLayout("Custom Connected Line (X vs Y)", {xaxis:{title:{text:"X"}}, yaxis:{title:{text:"Y"}}}),
       config
     );
-    setStatus("Rendered custom connected line.");
+    setStatus("Rendered custom connected line."); scrollToPlots();
   };
 
-  /* ---------- Hare–Lynx (phase + return) ---------- */
+  /* ======================= Hare–Lynx (phase/return) ======================= */
   document.getElementById("btn-make-lynx").onclick = () => {
     const f = document.getElementById("file-hl").files[0];
     if (!f) return setStatus("Upload a hare–lynx CSV first.", true);
@@ -268,39 +264,40 @@
       const colLynx = pickColumn(rows, ["Lynx","lynx","predator","lynxcount"], {fallbackNumeric:true});
       if (!colYear || !colHare || !colLynx) return setStatus("Couldn’t find Year/Hare/Lynx columns.", true);
 
-      const year = toNumberArray(rows.map(r => r[colYear]));
-      const hare = toNumberArray(rows.map(r => r[colHare]));
-      const lynx = toNumberArray(rows.map(r => r[colLynx]));
+      const year = toNumberArray(rows.map(r=>r[colYear]));
+      const hare = toNumberArray(rows.map(r=>r[colHare]));
+      const lynx = toNumberArray(rows.map(r=>r[colLynx]));
       const n = Math.min(year.length, hare.length, lynx.length);
       if (n < 3) return setStatus("Need ≥ 3 numeric rows.", true);
 
       Plotly.newPlot("plot2",
-        [{ x: hare.slice(0,n), y: lynx.slice(0,n), mode: "lines+markers", type: "scatter" }],
-        baseLayout("Phase Plane: Hare vs Lynx", { xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Lynx(t)"}} }),
+        [{x:hare.slice(0,n), y:lynx.slice(0,n), mode:"lines+markers", type:"scatter"}],
+        baseLayout("Phase Plane: Hare vs Lynx", {xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Lynx(t)"}}}),
         config
       );
 
       const ht=hare.slice(0,n-1), ht1=hare.slice(1,n);
       const lt=lynx.slice(0,n-1), lt1=lynx.slice(1,n);
-      const diag = (x,y)=>({x:[Math.min(...x,...y),Math.max(...x,...y)],y:[Math.min(...x,...y),Math.max(...x,...y)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false});
+      const diag=(x,y)=>({x:[Math.min(...x,...y),Math.max(...x,...y)], y:[Math.min(...x,...y),Math.max(...x,...y)],
+                          mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false});
 
       Plotly.newPlot("plot3",
-        [{ x: ht, y: ht1, mode: "markers", type: "scatter", name: "Hare" }, diag(ht,ht1)],
-        baseLayout("Return: Hare(t) → Hare(t+1)", { xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Hare(t+1)"}} }),
+        [{x:ht, y:ht1, mode:"markers", type:"scatter", name:"Hare"}, diag(ht,ht1)],
+        baseLayout("Return: Hare(t) → Hare(t+1)", {xaxis:{title:{text:"Hare(t)"}}, yaxis:{title:{text:"Hare(t+1)"}}}),
         config
       );
 
       Plotly.newPlot("plot4",
-        [{ x: lt, y: lt1, mode: "markers", type: "scatter", name: "Lynx" }, diag(lt,lt1)],
-        baseLayout("Return: Lynx(t) → Lynx(t+1)", { xaxis:{title:{text:"Lynx(t)"}}, yaxis:{title:{text:"Lynx(t+1)"}} }),
+        [{x:lt, y:lt1, mode:"markers", type:"scatter", name:"Lynx"}, diag(lt,lt1)],
+        baseLayout("Return: Lynx(t) → Lynx(t+1)", {xaxis:{title:{text:"Lynx(t)"}}, yaxis:{title:{text:"Lynx(t+1)"}}}),
         config
       );
 
-      setStatus("Rendered phase plane and return maps.");
+      setStatus("Rendered phase plane and return maps."); scrollToPlots();
     });
   };
 
-  /* ---------- Fitbit (rose + radar) ---------- */
+  /* ======================= Fitbit (rose + radar) ======================= */
   document.getElementById("btn-make-fitbit").onclick = () => {
     const f = document.getElementById("file-fitbit").files[0];
     if (!f) return setStatus("Upload a Fitbit/time CSV first.", true);
@@ -310,17 +307,17 @@
       if (!colTime || !colSteps) return setStatus("Couldn’t find time & steps columns.", true);
 
       const hours = new Array(24).fill(0), dow = new Array(7).fill(0), dowN = new Array(7).fill(0);
-      let valid = 0;
+      let valid=0;
       for (const r of rows){
         const d = toDate(r[colTime]); if (!d) continue;
-        const st = toNumber(r[colSteps]); if (st === null) continue;
-        valid++; hours[d.getHours()] += st; dow[(d.getDay()+6)%7] += st; dowN[(d.getDay()+6)%7] += 1;
+        const st = toNumber(r[colSteps]); if (st===null) continue;
+        valid++; hours[d.getHours()]+=st; dow[(d.getDay()+6)%7]+=st; dowN[(d.getDay()+6)%7]+=1;
       }
       if (!valid) return setStatus("No valid timestamps/steps found.", true);
 
-      const theta = hours.map((_, i) => (i+0.5) * (360/24));
+      const theta = hours.map((_,i)=>(i+0.5)*(360/24));
       Plotly.newPlot("plot5",
-        [{ type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24) }],
+        [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
         polarLayout("Nightingale Rose: Steps by Hour"),
         config
       );
@@ -328,16 +325,16 @@
       const means = dow.map((s,i)=> dowN[i] ? s/dowN[i] : 0);
       const labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
       Plotly.newPlot("plot6",
-        [{ type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself" }],
+        [{type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself"}],
         polarLayout("Radar: Mean Steps by Day of Week"),
         config
       );
 
-      setStatus("Rendered Nightingale rose and radar.");
+      setStatus("Rendered Nightingale rose and radar."); scrollToPlots();
     });
   };
 
-  /* ---------- Tribolium (cobweb) ---------- */
+  /* ======================= Tribolium (cobweb) ======================= */
   document.getElementById("btn-make-trib").onclick = () => {
     const f = document.getElementById("file-trib").files[0];
     if (!f) return setStatus("Upload a Tribolium CSV first.", true);
@@ -346,12 +343,11 @@
       const colVal = pickColumn(rows, ["adults","count","population","value","n"], {fallbackNumeric:true});
       if (!colT || !colVal) return setStatus("Couldn’t find t & Adults columns.", true);
 
-      const series = toNumberArray(rows.map(r => r[colVal]));
+      const series = toNumberArray(rows.map(r=>r[colVal]));
       if (series.length < 3) return setStatus("Need ≥ 3 numeric rows.", true);
-      const x = series.slice(0, -1);
-      const y = series.slice(1);
+      const x = series.slice(0,-1), y = series.slice(1);
 
-      // Quadratic fit
+      // quadratic fit
       const n=x.length;
       let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
       for (let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi;
@@ -363,79 +359,63 @@
           for(let i=0;i<m;i++) if(i!==k){ const f=M[i][k]; for(let j=k;j<=m;j++) M[i][j]-=f*M[k][j]; } }
         return M.map(r=>r[m]);
       }
-      const [a,b,c] = solve3([[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]], [Sy,Sxy,Sx2y]);
+      const [a,b,c] = solve3([[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]],[Sy,Sxy,Sx2y]);
 
-      const xmin = Math.min(...x, ...y), xmax = Math.max(...x, ...y);
-      const xs = Array.from({length:400}, (_,i)=> xmin + (xmax-xmin)*i/399);
-      const fx = xs.map(v=> a + b*v + c*v*v);
+      const xmin=Math.min(...x,...y), xmax=Math.max(...x,...y);
+      const xs=Array.from({length:400},(_,i)=> xmin+(xmax-xmin)*i/399);
+      const fx=xs.map(v=> a+b*v+c*v*v);
 
       const traces = [
-        { x: xs, y: fx, mode: "lines", name: "f(x)" },
-        { x: [xmin, xmax], y: [xmin, xmax], mode: "lines", line: { dash: "dot" }, hoverinfo: "skip", showlegend: false }
+        {x:xs, y:fx, mode:"lines", name:"f(x)"},
+        {x:[xmin,xmax], y:[xmin,xmax], mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false}
       ];
-      function cobweb(x0, steps=30){
-        let X=x0; const segs=[];
-        for(let i=0;i<steps;i++){ const Y=a + b*X + c*X*X; segs.push({x:[X,X], y:[X,Y]}); segs.push({x:[X,Y], y:[Y,Y]}); X=Y; }
+      function cobweb(x0,steps=30){ let X=x0; const segs=[];
+        for(let i=0;i<steps;i++){ const Y=a+b*X+c*X*X; segs.push({x:[X,X],y:[X,Y]}); segs.push({x:[X,Y],y:[Y,Y]}); X=Y; }
         return segs;
       }
-      for (const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin)))) {
-        traces.push({ x: s.x, y: s.y, mode: "lines", line: { width: 1 }, hoverinfo: "skip", showlegend: false });
-      }
+      for (const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin))))
+        traces.push({x:s.x,y:s.y,mode:"lines",line:{width:1},hoverinfo:"skip",showlegend:false});
 
       Plotly.newPlot("plot1", traces,
-        baseLayout("Cobweb (quadratic fit) – Tribolium", { xaxis:{title:{text:"x(t)"}}, yaxis:{title:{text:"x(t+1)"}} }),
+        baseLayout("Cobweb (quadratic fit) – Tribolium", {xaxis:{title:{text:"x(t)"}}, yaxis:{title:{text:"x(t+1)"}}}),
         config
       );
 
-      setStatus("Rendered cobweb diagram.");
+      setStatus("Rendered cobweb diagram."); scrollToPlots();
     });
   };
 
-  /* ---------- View mode buttons ---------- */
+  /* ======================= View mode + Fullscreen ======================= */
   const rowEl = document.getElementById("plot-row");
-  function setCols(n){
-    rowEl.classList.remove("cols1","cols2","cols3");
-    rowEl.classList.add(`cols${n}`);
-  }
+  function setCols(n){ rowEl.classList.remove("cols1","cols2","cols3"); rowEl.classList.add(`cols${n}`); }
   document.getElementById("view-1").onclick = () => setCols(1);
   document.getElementById("view-2").onclick = () => setCols(2);
   document.getElementById("view-3").onclick = () => setCols(3);
 
-  /* ---------- Double-click to fullscreen any plot ---------- */
   function makeFullscreenable(plotId){
     const el = document.getElementById(plotId);
     el.addEventListener("dblclick", () => openFullscreen(plotId));
   }
   for (let i=1;i<=6;i++) makeFullscreenable("plot"+i);
 
-  let fsActive = null;
+  let fsActive=null;
   function openFullscreen(plotId){
     if (fsActive) return;
-    const src = document.getElementById(plotId);
-    const wrap = document.createElement("div");
-    wrap.className = "fs-wrap";
-    wrap.innerHTML = `
-      <button class="fs-close" id="fs-close">Close (Esc)</button>
-      <div class="fs-inner"><div id="fs-plot"></div></div>
-    `;
-    document.body.appendChild(wrap);
-    fsActive = wrap;
+    const src=document.getElementById(plotId);
+    const wrap=document.createElement("div");
+    wrap.className="fs-wrap";
+    wrap.innerHTML=`<button class="fs-close" id="fs-close">Close (Esc)</button>
+                    <div class="fs-inner"><div id="fs-plot"></div></div>`;
+    document.body.appendChild(wrap); fsActive=wrap;
 
-    // clone the existing plot (data + layout)
-    const gd = src;
-    const data = gd.data ? JSON.parse(JSON.stringify(gd.data)) : [];
-    const layout = gd.layout ? JSON.parse(JSON.stringify(gd.layout)) : {};
+    const gd=src, data=gd.data?JSON.parse(JSON.stringify(gd.data)):[], layout=gd.layout?JSON.parse(JSON.stringify(gd.layout)):{};
     Plotly.newPlot("fs-plot", data, layout, {responsive:true, displaylogo:false});
 
     document.getElementById("fs-close").onclick = closeFullscreen;
     document.addEventListener("keydown", escClose);
   }
-  function escClose(e){ if (e.key === "Escape") closeFullscreen(); }
-  function closeFullscreen(){
-    if (!fsActive) return;
-    document.removeEventListener("keydown", escClose);
-    fsActive.remove(); fsActive = null;
-  }
+  function escClose(e){ if (e.key==="Escape") closeFullscreen(); }
+  function closeFullscreen(){ if (!fsActive) return; document.removeEventListener("keydown", escClose); fsActive.remove(); fsActive=null; }
   </script>
 </body>
 </html>
