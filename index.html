@@ -4,7 +4,9 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>BISC 643 – Clocks & Calendars (Interactive)</title>
+  <!-- Plotly + PapaParse (robust CSV parsing) -->
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
     :root { --pad: 14px; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0c10; color: #e8e8e8; }
@@ -31,6 +33,7 @@
   </header>
 
   <div class="wrap">
+    <!-- Controls -->
     <div class="card">
       <h2>Startup Box — Quick X/Y</h2>
       <label>X values (comma/space/newline-separated)</label>
@@ -60,8 +63,10 @@
       <p class="muted" style="margin-top:10px">Tip: Plotly’s toolbar (camera icon) lets you download images.</p>
     </div>
 
+    <!-- Plots -->
     <div class="card">
       <h2>Figures</h2>
+      <div id="status" style="margin:8px 0; font:12px system-ui; color:#cfd3dc;"></div>
       <div class="row">
         <div id="plot1" class="plot"></div>
         <div id="plot2" class="plot"></div>
@@ -76,7 +81,13 @@
 <script>
 const config = {responsive:true, displaylogo:false};
 
-// ---------- Utils ----------
+// ---------- helpers ----------
+function setStatus(msg, isError=false){
+  const el = document.getElementById("status");
+  el.style.color = isError ? "#ffb4b4" : "#cfd3dc";
+  el.textContent = msg;
+}
+
 function parseSeries(text) {
   if (!text) return [];
   let t = text.replace(/[;,\t\r\n]+/g, " ").trim().split(/\s+/);
@@ -84,46 +95,65 @@ function parseSeries(text) {
   for (const s of t) { const v = parseFloat(s); if (!isNaN(v)) out.push(v); }
   return out;
 }
-function readCSV(file, cb) { const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsText(file); }
-function csvToObjects(csvText) {
-  const lines = csvText.trim().split(/\r?\n/);
-  const headers = lines.shift().split(",").map(h=>h.trim());
-  return lines.map(line=>{
-    const parts = line.split(",").map(v=>v.trim());
-    const o={}; headers.forEach((h,i)=>o[h]=parts[i]); return o;
+
+function readCSV(file, cb) {
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: true,
+    complete: results => {
+      if (results.errors && results.errors.length) {
+        setStatus("CSV parsed with warnings: " + results.errors[0].message, true);
+      } else {
+        setStatus("Loaded " + file.name + " (" + results.data.length + " rows)");
+      }
+      cb(results.data); // array of objects with keys from header row
+    },
+    error: err => setStatus("CSV parse error: " + err, true)
   });
 }
-function toNumberArray(arr) { return arr.map(v=>parseFloat(v)).filter(v=>!Number.isNaN(v)); }
-function clearPlots(){ for(let i=1;i<=6;i++) Plotly.purge("plot"+i); }
 
-// ---------- X/Y quick plots ----------
-document.getElementById("btn-scatter").onclick = ()=>{
-  const xs=parseSeries(document.getElementById("xvals").value);
-  const ys=parseSeries(document.getElementById("yvals").value);
-  if(xs.length!==ys.length||xs.length<2){ alert("X and Y must be same length (>=2)."); return; }
-  Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"markers",type:"scatter"}],
-    {title:"Custom Scatter (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+function toNumberArray(arr) {
+  return arr.map(v => {
+    if (typeof v === "string") v = v.replace(/,/g,"");
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? null : n;
+  }).filter(v => v !== null);
+}
+
+function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus("Cleared."); }
+
+// ---------- Quick X/Y ----------
+document.getElementById("btn-scatter").onclick = () => {
+  const xs = parseSeries(document.getElementById("xvals").value);
+  const ys = parseSeries(document.getElementById("yvals").value);
+  if (xs.length !== ys.length || xs.length < 2) { setStatus("X and Y must be same length (≥2).", true); return; }
+  Plotly.newPlot("plot1", [{x: xs, y: ys, mode: "markers", type: "scatter"}],
+    {title: "Custom Scatter (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+  setStatus("Rendered custom scatter.");
 };
-document.getElementById("btn-line").onclick = ()=>{
-  const xs=parseSeries(document.getElementById("xvals").value);
-  const ys=parseSeries(document.getElementById("yvals").value);
-  if(xs.length!==ys.length||xs.length<2){ alert("X and Y must be same length (>=2)."); return; }
-  Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"lines+markers",type:"scatter"}],
-    {title:"Custom Connected Line (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+
+document.getElementById("btn-line").onclick = () => {
+  const xs = parseSeries(document.getElementById("xvals").value);
+  const ys = parseSeries(document.getElementById("yvals").value);
+  if (xs.length !== ys.length || xs.length < 2) { setStatus("X and Y must be same length (≥2).", true); return; }
+  Plotly.newPlot("plot1", [{x: xs, y: ys, mode: "lines+markers", type: "scatter"}],
+    {title: "Custom Connected Line (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+  setStatus("Rendered custom connected line.");
 };
 
-// ---------- Hare–Lynx ----------
-document.getElementById("btn-make-lynx").onclick = ()=>{
-  const f=document.getElementById("file-hl").files[0];
-  if(!f) return alert("Upload hare_lynx.csv first.");
-  readCSV(f, (txt)=>{
-    const rows=csvToObjects(txt);
-    const year=toNumberArray(rows.map(r=>r["Year"]));
-    const hare=toNumberArray(rows.map(r=>r["Hare"]));
-    const lynx=toNumberArray(rows.map(r=>r["Lynx"]));
-    if(hare.length<3||lynx.length<3) return alert("Need ≥ 3 rows.");
-
-    Plotly.newPlot("plot2", [{x:hare,y:lynx,mode:"lines+markers",type:"scatter"}],
+// ---------- Hare–Lynx: Phase + Returns ----------
+document.getElementById("btn-make-lynx").onclick = () => {
+  const f = document.getElementById("file-hl").files[0];
+  if (!f) return setStatus("Upload hare_lynx.csv first.", true);
+  readCSV(f, (rows) => {
+    const year = toNumberArray(rows.map(r => r["Year"]));
+    const hare = toNumberArray(rows.map(r => r["Hare"]));
+    const lynx = toNumberArray(rows.map(r => r["Lynx"]));
+    if (hare.length < 3 || lynx.length < 3 || year.length !== hare.length || hare.length !== lynx.length) {
+      setStatus("Need ≥ 3 rows with headers Year,Hare,Lynx.", true); return;
+    }
+    Plotly.newPlot("plot2", [{x: hare, y: lynx, mode: "lines+markers", type: "scatter"}],
       {title:"Phase Plane: Hare vs Lynx", xaxis:{title:"Hare(t)"}, yaxis:{title:"Lynx(t)"}}, config);
 
     const ht=hare.slice(0,-1), ht1=hare.slice(1);
@@ -134,77 +164,83 @@ document.getElementById("btn-make-lynx").onclick = ()=>{
       {title:"Return: Hare(t) → Hare(t+1)", xaxis:{title:"Hare(t)"}, yaxis:{title:"Hare(t+1)"}}, config);
     Plotly.newPlot("plot4", [{x:lt,y:lt1,mode:"markers",type:"scatter",name:"Lynx"}, diag2],
       {title:"Return: Lynx(t) → Lynx(t+1)", xaxis:{title:"Lynx(t)"}, yaxis:{title:"Lynx(t+1)"}}, config);
+
+    setStatus("Rendered phase plane and return maps.");
   });
 };
 
 // ---------- Fitbit: Rose + Radar ----------
-document.getElementById("btn-make-fitbit").onclick = ()=>{
-  const f=document.getElementById("file-fitbit").files[0];
-  if(!f) return alert("Upload fitbit_byminute.csv first.");
-  readCSV(f, (txt)=>{
-    const rows=csvToObjects(txt);
-    const hours=new Array(24).fill(0);
-    const dow=new Array(7).fill(0), dowN=new Array(7).fill(0);
-    for(const r of rows){
-      const ts=new Date(r["timestamp"]); if(isNaN(ts)) continue;
-      const st=parseFloat(r["steps"]); const v=isNaN(st)?0:st;
-      hours[ts.getHours()]+=v;
-      const d=(ts.getDay()+6)%7; dow[d]+=v; dowN[d]+=1; // Mon=0
+document.getElementById("btn-make-fitbit").onclick = () => {
+  const f = document.getElementById("file-fitbit").files[0];
+  if (!f) return setStatus("Upload fitbit_byminute.csv first.", true);
+  readCSV(f, (rows) => {
+    const hours = new Array(24).fill(0), dow = new Array(7).fill(0), dowN = new Array(7).fill(0);
+    for (const r of rows) {
+      const ts = new Date(r["timestamp"]);
+      if (isNaN(ts)) continue;
+      const st = (r["steps"]!==undefined && r["steps"]!==null) ? parseFloat((r["steps"]+"").replace(/,/g,"")) : 0;
+      const v = Number.isNaN(st) ? 0 : st;
+      hours[ts.getHours()] += v;
+      const d = (ts.getDay()+6)%7; dow[d] += v; dowN[d] += 1; // Mon=0
     }
-    const theta=hours.map((_,i)=>(i+0.5)*(360/24));
+    const theta = hours.map((_, i) => (i+0.5) * (360/24));
     Plotly.newPlot("plot5", [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
       {title:"Nightingale Rose: Steps by Hour", polar:{angularaxis:{direction:"clockwise"}}}, config);
 
-    const means=dow.map((s,i)=>dowN[i]?s/dowN[i]:0);
-    const labels=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const means = dow.map((s,i)=> dowN[i] ? s/dowN[i] : 0);
+    const labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
     Plotly.newPlot("plot6", [{type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself"}],
       {title:"Radar: Mean Steps by Day of Week"}, config);
+
+    setStatus("Rendered Nightingale rose and radar.");
   });
 };
 
 // ---------- Tribolium: Cobweb ----------
-document.getElementById("btn-make-trib").onclick = ()=>{
-  const f=document.getElementById("file-trib").files[0];
-  if(!f) return alert("Upload tribolium.csv first.");
-  readCSV(f, (txt)=>{
-    const rows=csvToObjects(txt);
-    const A=toNumberArray(rows.map(r=>r["Adults"]));
-    if(A.length<3) return alert("Need ≥ 3 rows.");
-    const x=A.slice(0,-1), y=A.slice(1);
-    // quadratic fit via normal equations
+document.getElementById("btn-make-trib").onclick = () => {
+  const f = document.getElementById("file-trib").files[0];
+  if (!f) return setStatus("Upload tribolium.csv first.", true);
+  readCSV(f, (rows) => {
+    const A = toNumberArray(rows.map(r => r["Adults"]));
+    if (A.length < 3) { setStatus("Need ≥ 3 rows with headers t,Adults.", true); return; }
+    const x = A.slice(0, -1), y = A.slice(1);
+
+    // Quadratic fit via normal equations
     const n=x.length;
     let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
-    for(let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi;
+    for (let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi;
       Sx+=xi; Sx2+=x2; Sx3+=x2*xi; Sx4+=x2*x2; Sy+=yi; Sxy+=xi*yi; Sx2y+=x2*yi; }
-    function solve3(A,B){ // Gauss elimination
-      const M=A.map((r,i)=>r.concat([B[i]])); const m=M.length;
+    function solve3(A,B){ const M=A.map((r,i)=>r.concat([B[i]])); const m=M.length;
       for(let k=0;k<m;k++){ let p=k; for(let i=k+1;i<m;i++) if(Math.abs(M[i][k])>Math.abs(M[p][k])) p=i;
         [M[k],M[p]]=[M[p],M[k]]; const piv=M[k][k]||1e-12;
         for(let j=k;j<=m;j++) M[k][j]/=piv;
         for(let i=0;i<m;i++) if(i!==k){ const f=M[i][k]; for(let j=k;j<=m;j++) M[i][j]-=f*M[k][j]; } }
       return M.map(r=>r[m]);
     }
-    const [a,b,c]=solve3(
+    const [a,b,c] = solve3(
       [[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]],
       [Sy,Sxy,Sx2y]
     );
-    const xmin=Math.min(...x), xmax=Math.max(...x);
-    const xs=Array.from({length:400},(_,i)=>xmin+(xmax-xmin)*i/399);
-    const fxs=xs.map(v=>a+b*v+c*v*v);
-    const traces=[
-      {x:xs, y:fxs, mode:"lines", name:"f(x)"},
-      {x:[xmin,xmax], y:[xmin,xmax], mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false}
+
+    const xmin = Math.min(...x), xmax = Math.max(...x);
+    const xs = Array.from({length:400}, (_,i)=> xmin + (xmax-xmin)*i/399);
+    const fx = xs.map(v=> a + b*v + c*v*v);
+    const traces = [
+      {x: xs, y: fx, mode: "lines", name: "f(x)"},
+      {x: [xmin,xmax], y: [xmin,xmax], mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false}
     ];
-    function cobweb(x0,steps=30){ let X=x0; const segs=[];
-      for(let i=0;i<steps;i++){ const Y=a+b*X+c*X*X; segs.push({x:[X,X],y:[X,Y]}); segs.push({x:[X,Y],y:[Y,Y]}); X=Y; }
+    function cobweb(x0, steps=30){ let X=x0; const segs=[];
+      for(let i=0;i<steps;i++){ const Y=a + b*X + c*X*X; segs.push({x:[X,X], y:[X,Y]}); segs.push({x:[X,Y], y:[Y,Y]}); X=Y; }
       return segs;
     }
-    for(const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin)))){
+    for (const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin)))) {
       traces.push({x:s.x,y:s.y,mode:"lines",line:{width:1},hoverinfo:"skip",showlegend:false});
     }
     Plotly.newPlot("plot1", traces, {title:"Cobweb (quadratic fit) – Tribolium", xaxis:{title:"x(t)"}, yaxis:{title:"x(t+1)"}}, config);
+    setStatus("Rendered cobweb diagram.");
   });
 };
+
 document.getElementById("btn-clear").onclick = clearPlots;
 </script>
 </body>
