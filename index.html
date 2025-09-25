@@ -23,7 +23,7 @@
     .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .muted { color:#9aa3b2; font-size:12px; }
 
-    /* --- layout: controls + plots; plots first on mobile --- */
+    /* layout: controls + plots; plots first on mobile */
     .wrap {
       display:grid; gap:16px;
       grid-template-areas:"controls plots";
@@ -33,21 +33,16 @@
     .controls { grid-area:controls; }
     .plots    { grid-area:plots; }
     @media (max-width: 900px) {
-      .wrap {
-        grid-template-areas:
-          "plots"
-          "controls";
-        grid-template-columns:1fr;
-      }
+      .wrap { grid-template-areas:"plots" "controls"; grid-template-columns:1fr; }
     }
 
-    /* --- view toolbar row --- */
+    /* view toolbar row */
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
     .toolbar .viewbar { display:inline-flex; gap:8px; align-items:center; }
     .toolbar .viewbar button { width:auto; padding-inline:10px; }
 
-    /* --- plot grid + view modes --- */
-    .row { display:grid; gap:16px; grid-template-columns:1fr 1fr; } /* default 2-up */
+    /* plot grid + view modes */
+    .row { display:grid; gap:16px; grid-template-columns:1fr 1fr; }
     .row.cols1 { grid-template-columns:1fr; }
     .row.cols2 { grid-template-columns:1fr 1fr; }
     .row.cols3 { grid-template-columns:1fr 1fr 1fr; }
@@ -58,17 +53,13 @@
     .js-plotly-plot .gtitle { white-space:normal !important; }
     .js-plotly-plot .main-svg { overflow:visible !important; }
 
-    /* --- fullscreen overlay --- */
+    /* fullscreen overlay */
     .fs-wrap { position:fixed; inset:0; z-index:9999; background:rgba(11,12,16,.98); padding:10px; display:grid; place-items:center; }
     .fs-inner { width:min(1200px,95vw); height:min(90vh,900px); }
     .fs-close { position:fixed; top:10px; right:12px; background:#14161d; color:#e8e8e8; border:1px solid #2b3245; padding:8px 10px; border-radius:8px; cursor:pointer; }
 
-    /* --- button highlight states --- */
-    button.active {
-      background:#1d2433 !important;
-      border-color:#3a4a6a !important;
-      box-shadow:0 0 0 2px rgba(110,168,254,.35);
-    }
+    /* button highlight states */
+    button.active { background:#1d2433 !important; border-color:#3a4a6a !important; box-shadow:0 0 0 2px rgba(110,168,254,.35); }
     .toolbar .viewbar button.active { background:#202a3d !important; }
   </style>
 </head>
@@ -165,6 +156,13 @@
     setTimeout(() => el.classList.remove('active'), ms);
   }
 
+  // shorten long titles (prevents overlap)
+  function shortTitle(s, max=42){
+    s = String(s || "");
+    return s.length > max ? s.slice(0, max-1) + "…" : s;
+  }
+
+  // number/time parsing
   function toNumber(v){
     if (v === null || v === undefined) return null;
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -214,19 +212,31 @@
     });
   }
 
+  // Nice axis ranges using percentiles (avoid skinny plots)
+  function niceRange(arr, pad=0.06, pLow=1, pHigh=99){
+    const a = arr.slice().sort((x,y)=>x-y);
+    const q = (p)=> a.length ? a[Math.max(0, Math.min(a.length-1, Math.round(p/100*(a.length-1))))] : 0;
+    let lo = q(pLow), hi = q(pHigh);
+    if (hi === lo) { const d = Math.max(1, Math.abs(lo)||1); lo -= d*0.5; hi += d*0.5; }
+    const span = hi - lo; lo -= span*pad; hi += span*pad;
+    return [lo, hi];
+  }
+
   function baseLayout(titleText, extra={}){
     return Object.assign({
-      title:{ text:titleText, x:0.02, xanchor:"left", font:{size:16}},
+      title:{ text: shortTitle(titleText), x:0.02, xanchor:"left", font:{size:16}},
       margin:{ t:60, r:30, b:60, l:70 },
       xaxis:{ title:{text:""}, automargin:true, tickfont:{size:11}, titlefont:{size:12} },
       yaxis:{ title:{text:""}, automargin:true, tickfont:{size:11}, titlefont:{size:12} },
-      hoverlabel:{ font:{size:11} }
+      hoverlabel:{ font:{size:11} },
+      legend:{orientation:"h", y:-0.18}
     }, extra);
   }
+
   function polarLayout(titleText, extra={}){
     return Object.assign({
-      title:{ text:titleText, x:0.02, xanchor:"left", font:{size:16}},
-      margin:{ t:60, r:30, b:40, l:30 },
+      title:{ text: shortTitle(titleText, 30), x:0.02, xanchor:"left", font:{size:16}},
+      margin:{ t:70, r:30, b:40, l:30 },             /* extra top breathing room */
       polar:{ angularaxis:{direction:"clockwise", tickfont:{size:11}},
               radialaxis:{tickfont:{size:11}, angle:0, ticks:"outside"} },
       hoverlabel:{ font:{size:11} }
@@ -266,20 +276,27 @@
     setStatus("Rendered custom connected line."); scrollToPlots();
   };
 
-  /* ================== Hare–Lynx (phase/return) — FIXED ================== */
+  /* ================== Hare–Lynx (phase/return) ================== */
+  function setCols(n){ const rowEl=document.getElementById("plot-row"); rowEl.classList.remove("cols1","cols2","cols3"); rowEl.classList.add(`cols${n}`); }
+  const btnV1 = document.getElementById("view-1"), btnV2 = document.getElementById("view-2"), btnV3 = document.getElementById("view-3");
+  const viewBtns = [btnV1, btnV2, btnV3];
+  btnV1.onclick = () => { setCols(1); setActive(btnV1, viewBtns); };
+  btnV2.onclick = () => { setCols(2); setActive(btnV2, viewBtns); };
+  btnV3.onclick = () => { setCols(3); setActive(btnV3, viewBtns); };
+  setCols(2); setActive(btnV2, viewBtns);     // default = 2-up
+
   document.getElementById("btn-make-lynx").onclick = function () {
     flash(this);
     const f = document.getElementById("file-hl").files[0];
     if (!f) return setStatus("Upload a hare–lynx CSV first.", true);
 
     readCSV(f, rows => {
-      // flexible headers
       const colYear = pickColumn(rows, ["Year","year","YEAR","date","yr"], {fallbackNumeric:true});
       const colHare = pickColumn(rows, ["Hare","hare","prey","hares","harecount"], {fallbackNumeric:true});
       const colLynx = pickColumn(rows, ["Lynx","lynx","predator","lynxcount"], {fallbackNumeric:true});
       if (!colYear || !colHare || !colLynx) return setStatus("Couldn’t find Year/Hare/Lynx columns.", true);
 
-      // clean + sort by year (prevents zigzags/teleport line)
+      // clean + sort by year (prevents zigzags)
       let T = rows.map(r => ({
         year: toNumber(r[colYear]),
         hare: toNumber(r[colHare]),
@@ -299,15 +316,16 @@
                           marker:{ size:6, color:idx, colorscale:"Blues", colorbar:{title:"Order"} },
                           name:"time" };
 
+      const xr = niceRange(hare), yr = niceRange(lynx);
       Plotly.newPlot("plot2", [phaseLine, phasePts],
         baseLayout("Phase Plane: Hare vs Lynx", {
-          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s" },
-          yaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s" }
+          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s", range:xr },
+          yaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s", range:yr }
         }),
         config
       );
 
-      // return maps
+      // return maps with percentile ranges
       const ht = hare.slice(0,-1), ht1 = hare.slice(1);
       const lt = lynx.slice(0,-1), lt1 = lynx.slice(1);
       const diag = (x,y)=>({
@@ -318,33 +336,25 @@
 
       Plotly.newPlot("plot3",
         [{x:ht, y:ht1, mode:"markers", type:"scatter", name:"Hare"}, diag(ht,ht1)],
-        baseLayout("Return: Hare(t) → Hare(t+1)", {
-          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s" },
-          yaxis:{ title:{text:"Hare(t+1)"}, tickformat:",~s" }
+        baseLayout("Return: Hare → Hare+1", {
+          xaxis:{ title:{text:"Hare(t)"}, tickformat:",~s", range:niceRange(ht) },
+          yaxis:{ title:{text:"Hare(t+1)"}, tickformat:",~s", range:niceRange(ht1) }
         }),
         config
       );
 
       Plotly.newPlot("plot4",
         [{x:lt, y:lt1, mode:"markers", type:"scatter", name:"Lynx"}, diag(lt,lt1)],
-        baseLayout("Return: Lynx(t) → Lynx(t+1)", {
-          xaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s" },
-          yaxis:{ title:{text:"Lynx(t+1)"}, tickformat:",~s" }
+        baseLayout("Return: Lynx → Lynx+1", {
+          xaxis:{ title:{text:"Lynx(t)"}, tickformat:",~s", range:niceRange(lt) },
+          yaxis:{ title:{text:"Lynx(t+1)"}, tickformat:",~s", range:niceRange(lt1) }
         }),
         config
       );
 
       setStatus("Rendered phase plane and return maps (sorted by year).");
+      setCols(1); setActive(btnV1, viewBtns);  // focus the new figure
       scrollToPlots();
-
-      // Optional: direction arrows (toggle by uncommenting)
-      // const N = Math.ceil(T.length / 6);
-      // const ann = [];
-      // for (let i = 0; i < T.length - 1; i += N) {
-      //   ann.push({ ax:hare[i], ay:lynx[i], x:hare[i+1], y:lynx[i+1],
-      //              arrowhead:3, arrowsize:1, arrowwidth:1, arrowcolor:"#7aa2ff", showarrow:true });
-      // }
-      // Plotly.relayout("plot2", { annotations: ann });
     });
   };
 
@@ -367,22 +377,22 @@
       }
       if (!valid) return setStatus("No valid timestamps/steps found.", true);
 
-      const theta = hours.map((_,i)=>(i+0.5)*(360/24));
       Plotly.newPlot("plot5",
-        [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
-        polarLayout("Nightingale Rose: Steps by Hour"),
+        [{type:"barpolar", r:hours, theta:hours.map((_,i)=>(i+0.5)*(360/24)), width:new Array(24).fill(360/24)}],
+        polarLayout("Nightingale Rose"),
         config
       );
 
       const means = dow.map((s,i)=> dowN[i] ? s/dowN[i] : 0);
-      const labels = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
       Plotly.newPlot("plot6",
-        [{type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself"}],
-        polarLayout("Radar: Mean Steps by Day of Week"),
+        [{type:"scatterpolar", r:means.concat([means[0]]), theta:["Mon","Tue","Wed","Thu","Fri","Sat","Sun","Mon"], mode:"lines+markers", fill:"toself"}],
+        polarLayout("Radar: Mean Steps / Day"),
         config
       );
 
-      setStatus("Rendered Nightingale rose and radar."); scrollToPlots();
+      setStatus("Rendered Nightingale rose and radar.");
+      setCols(1); setActive(btnV1, viewBtns);
+      scrollToPlots();
     });
   };
 
@@ -400,7 +410,7 @@
       if (series.length < 3) return setStatus("Need ≥ 3 numeric rows.", true);
       const x = series.slice(0,-1), y = series.slice(1);
 
-      // quadratic fit
+      // quadratic fit (least squares)
       const n=x.length;
       let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
       for (let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi;
@@ -429,29 +439,23 @@
       for (const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin))))
         traces.push({x:s.x,y:s.y,mode:"lines",line:{width:1},hoverinfo:"skip",showlegend:false});
 
+      const rX = niceRange(x.concat(y));
+      const rY = niceRange(x.concat(y));
       Plotly.newPlot("plot1", traces,
-        baseLayout("Cobweb (quadratic fit) – Tribolium", {xaxis:{title:{text:"x(t)"}}, yaxis:{title:{text:"x(t+1)"}}}),
+        baseLayout("Cobweb (quadratic fit) – Tribolium", {
+          xaxis:{title:{text:"x(t)"}, range:rX},
+          yaxis:{title:{text:"x(t+1)"}, range:rY}
+        }),
         config
       );
 
-      setStatus("Rendered cobweb diagram."); scrollToPlots();
+      setStatus("Rendered cobweb diagram.");
+      setCols(1); setActive(btnV1, viewBtns);
+      scrollToPlots();
     });
   };
 
-  /* ======================= View mode + Fullscreen ======================= */
-  const rowEl = document.getElementById("plot-row");
-  const btnV1 = document.getElementById("view-1");
-  const btnV2 = document.getElementById("view-2");
-  const btnV3 = document.getElementById("view-3");
-  const viewBtns = [btnV1, btnV2, btnV3];
-
-  function setCols(n){ rowEl.classList.remove("cols1","cols2","cols3"); rowEl.classList.add(`cols${n}`); }
-  btnV1.onclick = () => { setCols(1); setActive(btnV1, viewBtns); };
-  btnV2.onclick = () => { setCols(2); setActive(btnV2, viewBtns); };
-  btnV3.onclick = () => { setCols(3); setActive(btnV3, viewBtns); };
-  // default selection = 2-up
-  setCols(2); setActive(btnV2, viewBtns);
-
+  /* ======================= Fullscreen + clears ======================= */
   function makeFullscreenable(plotId){
     const el = document.getElementById(plotId);
     el.addEventListener("dblclick", () => openFullscreen(plotId));
@@ -477,12 +481,9 @@
   function escClose(e){ if (e.key==="Escape") closeFullscreen(); }
   function closeFullscreen(){ if (!fsActive) return; document.removeEventListener("keydown", escClose); fsActive.remove(); fsActive=null; }
 
-  // clear actions with flash
   document.getElementById("btn-clear").onclick = function(){ flash(this); clearPlots(); };
   document.getElementById("btn-clear-files").onclick = function(){ flash(this); clearFiles(); };
   </script>
 </body>
-</html>
-
 </html>
 
