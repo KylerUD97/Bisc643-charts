@@ -19,7 +19,7 @@
     label { display:block; font-size:12px; margin-bottom:6px; color:#cfd3dc; }
     textarea,input,button { width:100%; box-sizing:border-box; font:inherit; padding:8px; border-radius:8px; border:1px solid #2b3245; background:#0f1117; color:#e8e8e8; }
     textarea { min-height:80px; resize:vertical; }
-    button { cursor:pointer; }
+    button { cursor:pointer; transition: background .15s ease, border-color .15s ease, box-shadow .15s ease; }
     .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .muted { color:#9aa3b2; font-size:12px; }
 
@@ -45,7 +45,6 @@
     .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px; }
     .toolbar .viewbar { display:inline-flex; gap:8px; align-items:center; }
     .toolbar .viewbar button { width:auto; padding-inline:10px; }
-    .toolbar .tip { text-align:right; }
 
     /* --- plot grid + view modes --- */
     .row { display:grid; gap:16px; grid-template-columns:1fr 1fr; } /* default 2-up */
@@ -63,6 +62,14 @@
     .fs-wrap { position:fixed; inset:0; z-index:9999; background:rgba(11,12,16,.98); padding:10px; display:grid; place-items:center; }
     .fs-inner { width:min(1200px,95vw); height:min(90vh,900px); }
     .fs-close { position:fixed; top:10px; right:12px; background:#14161d; color:#e8e8e8; border:1px solid #2b3245; padding:8px 10px; border-radius:8px; cursor:pointer; }
+
+    /* --- button highlight states --- */
+    button.active {
+      background:#1d2433 !important;
+      border-color:#3a4a6a !important;
+      box-shadow:0 0 0 2px rgba(110,168,254,.35);
+    }
+    .toolbar .viewbar button.active { background:#202a3d !important; }
   </style>
 </head>
 <body>
@@ -116,9 +123,9 @@
       <div class="toolbar">
         <div class="viewbar">
           <span class="muted">View:</span>
-          <button id="view-1">1-up</button>
-          <button id="view-2">2-up</button>
-          <button id="view-3">3-up</button>
+          <button id="view-1" aria-pressed="false">1-up</button>
+          <button id="view-2" aria-pressed="false">2-up</button>
+          <button id="view-3" aria-pressed="false">3-up</button>
         </div>
         <div class="muted tip">Double-click any plot to fullscreen (Esc to exit).</div>
       </div>
@@ -146,6 +153,16 @@
     if (!el) return;
     el.style.color = isError ? "#ffb4b4" : "#e3e7ef";
     el.textContent = msg;
+  }
+
+  // highlight helpers
+  function setActive(el, group){
+    group.forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed','false'); });
+    el.classList.add('active'); el.setAttribute('aria-pressed','true');
+  }
+  function flash(el, ms=450){
+    el.classList.add('active');
+    setTimeout(() => el.classList.remove('active'), ms);
   }
 
   function toNumber(v){
@@ -219,9 +236,6 @@
   function clearPlots(){ for (let i=1;i<=6;i++) Plotly.purge("plot"+i); setStatus("Cleared."); }
   function clearFiles(){ ["file-hl","file-fitbit","file-trib"].forEach(id=>{const el=document.getElementById(id); if (el) el.value="";}); setStatus("Cleared chosen files. (Nothing was uploaded.)"); }
 
-  document.getElementById("btn-clear").onclick = clearPlots;
-  document.getElementById("btn-clear-files").onclick = clearFiles;
-
   function scrollToPlots(){
     const card = document.querySelector('.card.plots'); if (!card) return;
     card.scrollIntoView({behavior:'smooth', block:'start'});
@@ -230,7 +244,8 @@
   /* ============================ Quick X/Y ============================ */
   function parseSeries(text){ if (!text) return []; return toNumberArray(text.replace(/[;,\t\r\n]+/g," ").trim().split(/\s+/)); }
 
-  document.getElementById("btn-scatter").onclick = () => {
+  document.getElementById("btn-scatter").onclick = function () {
+    flash(this);
     const xs = parseSeries(document.getElementById("xvals").value);
     const ys = parseSeries(document.getElementById("yvals").value);
     if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
@@ -242,7 +257,8 @@
     setStatus("Rendered custom scatter."); scrollToPlots();
   };
 
-  document.getElementById("btn-line").onclick = () => {
+  document.getElementById("btn-line").onclick = function () {
+    flash(this);
     const xs = parseSeries(document.getElementById("xvals").value);
     const ys = parseSeries(document.getElementById("yvals").value);
     if (xs.length !== ys.length || xs.length < 2) return setStatus("X and Y must be same length (≥2).", true);
@@ -255,7 +271,8 @@
   };
 
   /* ======================= Hare–Lynx (phase/return) ======================= */
-  document.getElementById("btn-make-lynx").onclick = () => {
+  document.getElementById("btn-make-lynx").onclick = function () {
+    flash(this);
     const f = document.getElementById("file-hl").files[0];
     if (!f) return setStatus("Upload a hare–lynx CSV first.", true);
     readCSV(f, rows => {
@@ -298,7 +315,8 @@
   };
 
   /* ======================= Fitbit (rose + radar) ======================= */
-  document.getElementById("btn-make-fitbit").onclick = () => {
+  document.getElementById("btn-make-fitbit").onclick = function () {
+    flash(this);
     const f = document.getElementById("file-fitbit").files[0];
     if (!f) return setStatus("Upload a Fitbit/time CSV first.", true);
     readCSV(f, rows => {
@@ -335,7 +353,8 @@
   };
 
   /* ======================= Tribolium (cobweb) ======================= */
-  document.getElementById("btn-make-trib").onclick = () => {
+  document.getElementById("btn-make-trib").onclick = function () {
+    flash(this);
     const f = document.getElementById("file-trib").files[0];
     if (!f) return setStatus("Upload a Tribolium CSV first.", true);
     readCSV(f, rows => {
@@ -387,10 +406,17 @@
 
   /* ======================= View mode + Fullscreen ======================= */
   const rowEl = document.getElementById("plot-row");
+  const btnV1 = document.getElementById("view-1");
+  const btnV2 = document.getElementById("view-2");
+  const btnV3 = document.getElementById("view-3");
+  const viewBtns = [btnV1, btnV2, btnV3];
+
   function setCols(n){ rowEl.classList.remove("cols1","cols2","cols3"); rowEl.classList.add(`cols${n}`); }
-  document.getElementById("view-1").onclick = () => setCols(1);
-  document.getElementById("view-2").onclick = () => setCols(2);
-  document.getElementById("view-3").onclick = () => setCols(3);
+  btnV1.onclick = () => { setCols(1); setActive(btnV1, viewBtns); };
+  btnV2.onclick = () => { setCols(2); setActive(btnV2, viewBtns); };
+  btnV3.onclick = () => { setCols(3); setActive(btnV3, viewBtns); };
+  // default selection = 2-up
+  setCols(2); setActive(btnV2, viewBtns);
 
   function makeFullscreenable(plotId){
     const el = document.getElementById(plotId);
@@ -416,7 +442,13 @@
   }
   function escClose(e){ if (e.key==="Escape") closeFullscreen(); }
   function closeFullscreen(){ if (!fsActive) return; document.removeEventListener("keydown", escClose); fsActive.remove(); fsActive=null; }
+
+  // clear actions with flash
+  document.getElementById("btn-clear").onclick = function(){ flash(this); clearPlots(); };
+  document.getElementById("btn-clear-files").onclick = function(){ flash(this); clearFiles(); };
   </script>
 </body>
+</html>
+
 </html>
 
