@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BISC 643 – Clocks & Calendars (Interactive)</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    :root { --pad: 14px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b0c10; color: #e8e8e8; }
+    header { padding: var(--pad); border-bottom: 1px solid #222; background: #111217; position: sticky; top: 0; z-index: 10; }
+    h1 { margin: 0 0 6px; font-size: 20px; }
+    .wrap { display: grid; gap: 16px; grid-template-columns: 320px 1fr; padding: var(--pad); }
+    .card { background: #14161d; border: 1px solid #1f2330; border-radius: 12px; padding: var(--pad); box-shadow: 0 0 0 1px #0b0c10 inset; }
+    .card h2 { font-size: 16px; margin: 0 0 8px; }
+    label { display: block; font-size: 12px; margin-bottom: 6px; color: #cfd3dc; }
+    textarea, input, button { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid #2b3245; background: #0f1117; color: #e8e8e8; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { cursor: pointer; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .plot { height: 420px; }
+    .muted { color: #9aa3b2; font-size: 12px; }
+    .row { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } .row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Clocks & Calendars — Interactive Charts</h1>
+    <div class="muted">Paste X/Y or upload CSVs. Nothing uploads to a server—everything runs in your browser.</div>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Startup Box — Quick X/Y</h2>
+      <label>X values (comma/space/newline-separated)</label>
+      <textarea id="xvals" placeholder="e.g., 1, 2, 3, 4"></textarea>
+      <label>Y values (same length as X)</label>
+      <textarea id="yvals" placeholder="e.g., 2, 4, 3, 6"></textarea>
+      <div class="grid-2">
+        <button id="btn-scatter">Make Scatter</button>
+        <button id="btn-line">Make Connected Line</button>
+      </div>
+      <hr style="border-color:#1f2330; margin:14px 0;">
+      <h2>Upload CSVs</h2>
+      <label>Hare–Lynx CSV (headers: Year,Hare,Lynx)</label>
+      <input type="file" id="file-hl" accept=".csv"/>
+      <label>Fitbit by-minute CSV (headers: timestamp,steps)</label>
+      <input type="file" id="file-fitbit" accept=".csv"/>
+      <label>Tribolium CSV (headers: t,Adults)</label>
+      <input type="file" id="file-trib" accept=".csv"/>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-lynx">Phase & Return (HL)</button>
+        <button id="btn-make-fitbit">Rose & Radar</button>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-trib">Cobweb (Tribolium)</button>
+        <button id="btn-clear">Clear Plots</button>
+      </div>
+      <p class="muted" style="margin-top:10px">Tip: Plotly’s toolbar (camera icon) lets you download images.</p>
+    </div>
+
+    <div class="card">
+      <h2>Figures</h2>
+      <div class="row">
+        <div id="plot1" class="plot"></div>
+        <div id="plot2" class="plot"></div>
+        <div id="plot3" class="plot"></div>
+        <div id="plot4" class="plot"></div>
+        <div id="plot5" class="plot"></div>
+        <div id="plot6" class="plot"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const config = {responsive:true, displaylogo:false};
+
+// ---------- Utils ----------
+function parseSeries(text) {
+  if (!text) return [];
+  let t = text.replace(/[;,\t\r\n]+/g, " ").trim().split(/\s+/);
+  let out = [];
+  for (const s of t) { const v = parseFloat(s); if (!isNaN(v)) out.push(v); }
+  return out;
+}
+function readCSV(file, cb) { const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsText(file); }
+function csvToObjects(csvText) {
+  const lines = csvText.trim().split(/\r?\n/);
+  const headers = lines.shift().split(",").map(h=>h.trim());
+  return lines.map(line=>{
+    const parts = line.split(",").map(v=>v.trim());
+    const o={}; headers.forEach((h,i)=>o[h]=parts[i]); return o;
+  });
+}
+function toNumberArray(arr) { return arr.map(v=>parseFloat(v)).filter(v=>!Number.isNaN(v)); }
+function clearPlots(){ for(let i=1;i<=6;i++) Plotly.purge("plot"+i); }
+
+// ---------- X/Y quick plots ----------
+document.getElementById("btn-scatter").onclick = ()=>{
+  const xs=parseSeries(document.getElementById("xvals").value);
+  const ys=parseSeries(document.getElementById("yvals").value);
+  if(xs.length!==ys.length||xs.length<2){ alert("X and Y must be same length (>=2)."); return; }
+  Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"markers",type:"scatter"}],
+    {title:"Custom Scatter (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+};
+document.getElementById("btn-line").onclick = ()=>{
+  const xs=parseSeries(document.getElementById("xvals").value);
+  const ys=parseSeries(document.getElementById("yvals").value);
+  if(xs.length!==ys.length||xs.length<2){ alert("X and Y must be same length (>=2)."); return; }
+  Plotly.newPlot("plot1", [{x:xs,y:ys,mode:"lines+markers",type:"scatter"}],
+    {title:"Custom Connected Line (X vs Y)", xaxis:{title:"X"}, yaxis:{title:"Y"}}, config);
+};
+
+// ---------- Hare–Lynx ----------
+document.getElementById("btn-make-lynx").onclick = ()=>{
+  const f=document.getElementById("file-hl").files[0];
+  if(!f) return alert("Upload hare_lynx.csv first.");
+  readCSV(f, (txt)=>{
+    const rows=csvToObjects(txt);
+    const year=toNumberArray(rows.map(r=>r["Year"]));
+    const hare=toNumberArray(rows.map(r=>r["Hare"]));
+    const lynx=toNumberArray(rows.map(r=>r["Lynx"]));
+    if(hare.length<3||lynx.length<3) return alert("Need ≥ 3 rows.");
+
+    Plotly.newPlot("plot2", [{x:hare,y:lynx,mode:"lines+markers",type:"scatter"}],
+      {title:"Phase Plane: Hare vs Lynx", xaxis:{title:"Hare(t)"}, yaxis:{title:"Lynx(t)"}}, config);
+
+    const ht=hare.slice(0,-1), ht1=hare.slice(1);
+    const lt=lynx.slice(0,-1), lt1=lynx.slice(1);
+    const diag1={x:[Math.min(...ht,...ht1),Math.max(...ht,...ht1)],y:[Math.min(...ht,...ht1),Math.max(...ht,...ht1)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false};
+    const diag2={x:[Math.min(...lt,...lt1),Math.max(...lt,...lt1)],y:[Math.min(...lt,...lt1),Math.max(...lt,...lt1)],mode:"lines",line:{dash:"dot"},hoverinfo:"skip",showlegend:false};
+    Plotly.newPlot("plot3", [{x:ht,y:ht1,mode:"markers",type:"scatter",name:"Hare"}, diag1],
+      {title:"Return: Hare(t) → Hare(t+1)", xaxis:{title:"Hare(t)"}, yaxis:{title:"Hare(t+1)"}}, config);
+    Plotly.newPlot("plot4", [{x:lt,y:lt1,mode:"markers",type:"scatter",name:"Lynx"}, diag2],
+      {title:"Return: Lynx(t) → Lynx(t+1)", xaxis:{title:"Lynx(t)"}, yaxis:{title:"Lynx(t+1)"}}, config);
+  });
+};
+
+// ---------- Fitbit: Rose + Radar ----------
+document.getElementById("btn-make-fitbit").onclick = ()=>{
+  const f=document.getElementById("file-fitbit").files[0];
+  if(!f) return alert("Upload fitbit_byminute.csv first.");
+  readCSV(f, (txt)=>{
+    const rows=csvToObjects(txt);
+    const hours=new Array(24).fill(0);
+    const dow=new Array(7).fill(0), dowN=new Array(7).fill(0);
+    for(const r of rows){
+      const ts=new Date(r["timestamp"]); if(isNaN(ts)) continue;
+      const st=parseFloat(r["steps"]); const v=isNaN(st)?0:st;
+      hours[ts.getHours()]+=v;
+      const d=(ts.getDay()+6)%7; dow[d]+=v; dowN[d]+=1; // Mon=0
+    }
+    const theta=hours.map((_,i)=>(i+0.5)*(360/24));
+    Plotly.newPlot("plot5", [{type:"barpolar", r:hours, theta:theta, width:new Array(24).fill(360/24)}],
+      {title:"Nightingale Rose: Steps by Hour", polar:{angularaxis:{direction:"clockwise"}}}, config);
+
+    const means=dow.map((s,i)=>dowN[i]?s/dowN[i]:0);
+    const labels=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    Plotly.newPlot("plot6", [{type:"scatterpolar", r:means.concat([means[0]]), theta:labels.concat([labels[0]]), mode:"lines+markers", fill:"toself"}],
+      {title:"Radar: Mean Steps by Day of Week"}, config);
+  });
+};
+
+// ---------- Tribolium: Cobweb ----------
+document.getElementById("btn-make-trib").onclick = ()=>{
+  const f=document.getElementById("file-trib").files[0];
+  if(!f) return alert("Upload tribolium.csv first.");
+  readCSV(f, (txt)=>{
+    const rows=csvToObjects(txt);
+    const A=toNumberArray(rows.map(r=>r["Adults"]));
+    if(A.length<3) return alert("Need ≥ 3 rows.");
+    const x=A.slice(0,-1), y=A.slice(1);
+    // quadratic fit via normal equations
+    const n=x.length;
+    let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
+    for(let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi;
+      Sx+=xi; Sx2+=x2; Sx3+=x2*xi; Sx4+=x2*x2; Sy+=yi; Sxy+=xi*yi; Sx2y+=x2*yi; }
+    function solve3(A,B){ // Gauss elimination
+      const M=A.map((r,i)=>r.concat([B[i]])); const m=M.length;
+      for(let k=0;k<m;k++){ let p=k; for(let i=k+1;i<m;i++) if(Math.abs(M[i][k])>Math.abs(M[p][k])) p=i;
+        [M[k],M[p]]=[M[p],M[k]]; const piv=M[k][k]||1e-12;
+        for(let j=k;j<=m;j++) M[k][j]/=piv;
+        for(let i=0;i<m;i++) if(i!==k){ const f=M[i][k]; for(let j=k;j<=m;j++) M[i][j]-=f*M[k][j]; } }
+      return M.map(r=>r[m]);
+    }
+    const [a,b,c]=solve3(
+      [[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]],
+      [Sy,Sxy,Sx2y]
+    );
+    const xmin=Math.min(...x), xmax=Math.max(...x);
+    const xs=Array.from({length:400},(_,i)=>xmin+(xmax-xmin)*i/399);
+    const fxs=xs.map(v=>a+b*v+c*v*v);
+    const traces=[
+      {x:xs, y:fxs, mode:"lines", name:"f(x)"},
+      {x:[xmin,xmax], y:[xmin,xmax], mode:"lines", line:{dash:"dot"}, hoverinfo:"skip", showlegend:false}
+    ];
+    function cobweb(x0,steps=30){ let X=x0; const segs=[];
+      for(let i=0;i<steps;i++){ const Y=a+b*X+c*X*X; segs.push({x:[X,X],y:[X,Y]}); segs.push({x:[X,Y],y:[Y,Y]}); X=Y; }
+      return segs;
+    }
+    for(const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.8*(xmax-xmin)))){
+      traces.push({x:s.x,y:s.y,mode:"lines",line:{width:1},hoverinfo:"skip",showlegend:false});
+    }
+    Plotly.newPlot("plot1", traces, {title:"Cobweb (quadratic fit) – Tribolium", xaxis:{title:"x(t)"}, yaxis:{title:"x(t+1)"}}, config);
+  });
+};
+document.getElementById("btn-clear").onclick = clearPlots;
+</script>
+</body>
+</html>
