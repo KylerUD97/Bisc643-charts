@@ -5,43 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Coupled Oscillators — Interactive Charts</title>
 
-<!-- Libraries -->
+<!-- libs -->
 <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
 <style>
-  :root { --pad: 14px; }
-  body{margin:0;background:#0b0c10;color:#e8e8e8;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-  header{position:sticky;top:0;z-index:5;background:#111217;border-bottom:1px solid #222;padding:var(--pad)}
-  h1{margin:0 0 6px;font-size:20px}
-  .muted{color:#9aa3b2;font-size:12px}
-  .wrap{display:grid;grid-template-columns:360px 1fr;gap:16px;padding:var(--pad)}
-  .card{background:#14161d;border:1px solid #1f2330;border-radius:12px;padding:var(--pad);box-shadow:0 0 0 1px #0b0c10 inset}
-  .card h2{font-size:16px;margin:0 0 8px}
-  label{display:block;font-size:12px;margin-bottom:6px;color:#cfd3dc}
-  input,button,textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px;border-radius:8px;border:1px solid #2b3245;background:#0f1117;color:#e8e8e8}
-  textarea{min-height:80px;resize:vertical}
-  button{cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .controls .row{display:flex;flex-wrap:wrap;gap:8px}
-  .controls .row label{display:flex;gap:6px;align-items:center;margin:0}
-  .plots{display:flex;flex-direction:column;gap:10px}
-  .toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-  .viewbar{display:flex;gap:8px;align-items:center}
-  .viewbar button{width:auto;padding-inline:10px}
-  #plot-grid{display:grid;gap:16px;grid-template-columns:1fr 1fr}
-  #plot-grid.cols1{grid-template-columns:1fr}
-  #plot-grid.cols2{grid-template-columns:1fr 1fr}
-  #plot-grid.cols3{grid-template-columns:1fr 1fr 1fr}
-  .plot{min-height:520px;width:100%}
-  .js-plotly-plot .gtitle{white-space:normal!important}
-  .js-plotly-plot .main-svg{overflow:visible!important}
-  button.active{background:#1d2433;border-color:#3a4a6a;box-shadow:0 0 0 2px rgba(110,168,254,.35)}
-  /* sticky figure header, plots scroll */
-  .fig-shell{display:flex;flex-direction:column;gap:8px}
-  .figs{max-height:calc(100vh - 170px);overflow:auto;border-radius:10px}
-  .tip{opacity:.9}
-  @media (max-width:900px){.wrap{grid-template-columns:1fr}.figs{max-height:none}}
+:root { --pad: 14px; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin:0; background:#0b0c10; color:#e8e8e8; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+header { position:sticky; top:0; z-index:50; padding:10px var(--pad); background:#111217; border-bottom:1px solid #1f2330; }
+h1 { margin:0; font-size:20px; }
+.muted { color:#9aa3b2; font-size:12px; }
+
+.layout {
+  display:grid; grid-template-columns: 360px 1fr; gap:16px; padding:var(--pad);
+  height: calc(100vh - 64px);
+}
+.controls { overflow:auto; padding-bottom:24px; }
+.card { background:#14161d; border:1px solid #1f2330; border-radius:12px; padding:12px; margin-bottom:12px; }
+.card h2 { margin:0 0 8px; font-size:16px; }
+label { display:block; font-size:12px; color:#cfd3dc; margin:8px 0 6px; }
+textarea,input,button { width:100%; background:#0f1117; color:#e8e8e8; border:1px solid #2b3245; border-radius:8px; padding:8px; font:inherit; }
+textarea { min-height:74px; resize:vertical; }
+button { cursor:pointer; transition: background .15s, border-color .15s, box-shadow .15s; }
+button:hover { border-color:#42527a; }
+button.active { background:#1d2433 !important; border-color:#3a4a6a !important; box-shadow:0 0 0 2px rgba(110,168,254,.35); }
+.row { display:grid; gap:16px; grid-auto-rows:minmax(380px,auto); }
+.row.cols1 { grid-template-columns: 1fr; }
+.row.cols2 { grid-template-columns: 1fr 1fr; }
+.row.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.plot { width:100%; height:100%; min-height:420px; border:1px solid #1f2330; border-radius:12px; background:#0e1016; }
+.plots { overflow:auto; padding-bottom:24px; }
+.toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:4px 0 8px; }
+.toolbar .viewbar { display:inline-flex; gap:8px; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.small { font-size:12px; }
+.checks { display:grid; grid-template-columns: 1fr 1fr; gap:6px 12px; margin-top:6px; }
+.checks label { display:flex; gap:8px; align-items:center; margin:0; }
+hr.sep { border:none; border-top:1px solid #222838; margin:12px 0; }
+#status { font-size:12px; color:#e3e7ef; min-height:18px; }
+
+.js-plotly-plot .gtitle { white-space:normal !important; }
+.js-plotly-plot .main-svg { overflow:visible !important; }
+
+.fs-wrap { position:fixed; inset:0; z-index:9999; background:rgba(11,12,16,.98); display:grid; place-items:center; padding:10px; }
+.fs-inner { width:min(1200px,95vw); height:min(90vh,900px); }
+.fs-close { position:fixed; top:10px; right:12px; background:#14161d; color:#e8e8e8; border:1px solid #2b3245; padding:8px 10px; border-radius:8px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -50,66 +60,95 @@
   <div class="muted">Header & controls stay fixed. Graphs have their own scroll area. Double-click a plot to fullscreen.</div>
 </header>
 
-<div class="wrap">
-  <!-- CONTROLS -->
-  <div class="card controls">
-    <h2>Startup Box — Quick X/Y</h2>
-    <label>X values</label>
-    <textarea id="xvals" placeholder="e.g., 1, 2, 3, 4"></textarea>
-    <label>Y values</label>
-    <textarea id="yvals" placeholder="e.g., 2, 4, 3, 6"></textarea>
-    <div class="grid-2" style="margin-bottom:10px">
-      <button id="btn-scatter">Make Scatter</button>
-      <button id="btn-line">Make Connected Line</button>
+<div class="layout">
+  <!-- LEFT: CONTROLS -->
+  <div class="controls">
+    <!-- Quick X/Y -->
+    <div class="card">
+      <h2>Startup Box — Quick X/Y</h2>
+      <label>X values</label>
+      <textarea id="xvals" placeholder="e.g., 1, 2, 3, 4"></textarea>
+      <label>Y values</label>
+      <textarea id="yvals" placeholder="e.g., 2, 4, 3, 6"></textarea>
+      <div class="grid-2" style="margin-top:6px">
+        <button id="btn-scatter">Make Scatter</button>
+        <button id="btn-line">Make Connected Line</button>
+      </div>
     </div>
 
-    <h2>Upload CSVs</h2>
-    <label>Hare–Lynx (Year / Hare / Lynx)</label>
-    <input id="file-hl" type="file" accept=".csv"/>
-    <label>Fitbit by-minute (timestamp + steps/value)</label>
-    <input id="file-fitbit" type="file" accept=".csv"/>
-    <label>Tribolium (t/index + Adults/value)</label>
-    <input id="file-trib" type="file" accept=".csv"/>
-    <label>Predator–Prey (time, prey, predator)</label>
-    <input id="file-mites" type="file" accept=".csv"/>
-
-    <div class="grid-2" style="margin-top:10px">
-      <button id="btn-make-lynx">Phase & Return (HL)</button>
-      <button id="btn-make-fitbit">Rose & Radar</button>
-    </div>
-    <div class="grid-2" style="margin-top:8px">
-      <button id="btn-make-trib">Cobweb (Tribolium)</button>
-      <button id="btn-make-mites">Predator–Prey (Mites)</button>
+    <!-- Hare–Lynx -->
+    <div class="card">
+      <h2>Hare–Lynx CSV</h2>
+      <div class="small muted">Flexible headers: Year/Hare/Lynx</div>
+      <input id="file-hl" type="file" accept=".csv"/>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-lynx">Phase & Return (HL)</button>
+        <button id="btn-clear-hl">Clear HL</button>
+      </div>
     </div>
 
-    <div class="row" style="margin-top:10px">
-      <label><input type="checkbox" id="opt-smooth" checked/> smooth path</label>
-      <label><input type="checkbox" id="opt-log"/> log axes (PP only)</label>
-      <label><input type="checkbox" id="opt-timepts" checked/> color points by time</label>
-      <label><input type="checkbox" id="opt-lvfit" checked/> overlay Lotka–Volterra fit</label>
+    <!-- Fitbit -->
+    <div class="card">
+      <h2>Fitbit minute CSV</h2>
+      <div class="small muted">Flexible: timestamp/time + steps/value</div>
+      <input id="file-fitbit" type="file" accept=".csv"/>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-fitbit">Rose & Radar</button>
+        <button id="btn-clear-fitbit">Clear Fitbit</button>
+      </div>
     </div>
 
-    <div class="grid-2" style="margin-top:10px">
-      <button id="btn-clear">Clear Plots</button>
-      <button id="btn-clear-files">Clear Files</button>
+    <!-- Tribolium -->
+    <div class="card">
+      <h2>Tribolium CSV</h2>
+      <div class="small muted">Flexible: t/index/time + Adults/population/value</div>
+      <input id="file-trib" type="file" accept=".csv"/>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-trib">Cobweb (Tribolium)</button>
+        <button id="btn-clear-trib">Clear Trib</button>
+      </div>
     </div>
-    <p class="muted" style="margin-top:8px">Files never leave your device. Use the camera icon on any chart to save a PNG.</p>
+
+    <!-- Predator–Prey (mites) -->
+    <div class="card">
+      <h2>Predator–Prey (mites)</h2>
+      <div class="small muted">Headers: time, prey, predator</div>
+      <input id="file-mites" type="file" accept=".csv"/>
+      <div class="grid-2" style="margin-top:8px">
+        <button id="btn-make-mites">Plot Phase & Returns</button>
+        <button id="btn-clear-mites">Clear Mites</button>
+      </div>
+      <div class="checks">
+        <label><input id="chk-smooth" type="checkbox" checked/> Show smoothed path</label>
+        <label><input id="chk-lv" type="checkbox" checked/> Overlay Lotka–Volterra fit</label>
+        <label><input id="chk-log" type="checkbox"/> Log scale axes</label>
+        <label><input id="chk-timepts" type="checkbox" checked/> Show points by time</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid-2">
+        <button id="btn-clear-plots">Clear All Plots</button>
+        <button id="btn-clear-files">Clear Files</button>
+      </div>
+      <div class="small muted" style="margin-top:6px">Files never leave your device.</div>
+    </div>
   </div>
 
-  <!-- PLOTS -->
-  <div class="card fig-shell">
-    <div class="toolbar">
-      <div class="viewbar">
-        <span class="muted">View:</span>
-        <button id="view-1">1-up</button>
-        <button id="view-2" class="active">2-up</button>
-        <button id="view-3">3-up</button>
+  <!-- RIGHT: PLOTS -->
+  <div class="plots">
+    <div class="card">
+      <div class="toolbar">
+        <div class="viewbar">
+          <span class="muted">View:</span>
+          <button id="view-1">1-up</button>
+          <button id="view-2">2-up</button>
+          <button id="view-3" class="active">3-up</button>
+        </div>
+        <div class="muted small">Use the camera icon on any chart to download a PNG.</div>
       </div>
-      <div class="muted tip" id="status">Ready.</div>
-    </div>
-
-    <div class="figs">
-      <div id="plot-grid" class="cols2">
+      <div id="status"></div>
+      <div id="grid" class="row cols3">
         <div id="plot1" class="plot"></div>
         <div id="plot2" class="plot"></div>
         <div id="plot3" class="plot"></div>
@@ -122,395 +161,280 @@
 </div>
 
 <script>
-/* ========== helpers ========== */
-const cfg = {responsive:true, displaylogo:false};
-const setCols = n => {
-  const g = document.getElementById('plot-grid');
-  g.classList.remove('cols1','cols2','cols3');
-  g.classList.add('cols'+n);
+/* ------------------------- helpers ------------------------- */
+const config = {responsive:true, displaylogo:false};
+const byId = id => document.getElementById(id);
+function setStatus(msg, err=false){ const el=byId('status'); el.textContent=msg||''; el.style.color = err? '#ffb4b4' : '#e3e7ef'; }
+function flash(btn){ btn.classList.add('active'); setTimeout(()=>btn.classList.remove('active'), 350); }
+function parseSeries(text){ if(!text) return []; return text.replace(/[;,\t\r\n]+/g,' ').trim().split(/\s+/).map(Number).filter(v=>Number.isFinite(v)); }
+function normKey(k){ return String(k||'').toLowerCase().replace(/[^a-z0-9]+/g,''); }
+function toNumber(v){ if(v===null||v===undefined) return null; if(typeof v==='number' && Number.isFinite(v)) return v;
+  let s=String(v).trim(); if(!s) return null; s=s.replace(/(?<=\d)[\s,](?=\d)/g,''); const pct=/%$/.test(s); s=s.replace(/%$/,'');
+  const n=Number(s); return Number.isFinite(n) ? (pct? n/100 : n) : null;
 }
-document.getElementById('view-1').onclick = e => {setCols(1); activate(e.target)};
-document.getElementById('view-2').onclick = e => {setCols(2); activate(e.target)};
-document.getElementById('view-3').onclick = e => {setCols(3); activate(e.target)};
-
-function activate(btn){
-  document.querySelectorAll('.viewbar button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
+function toDate(val){ if(val===null||val===undefined||val==='') return null;
+  if(val instanceof Date && !isNaN(val)) return val;
+  if(typeof val==='number'){ const ms = val>=1e12? val : (val>=1e9? val*1000 : val); const d=new Date(ms); return isNaN(d)? null : d; }
+  let d=new Date(String(val)); if(!isNaN(d)) return d; d=new Date(String(val).replace(/-/g,'/')); return isNaN(d)? null : d;
 }
-function status(msg, bad=false){
-  const el = document.getElementById('status');
-  el.style.color = bad ? '#ffb4b4' : '#9ec1ff';
-  el.textContent = msg;
-}
-function flash(el){ el.classList.add('active'); setTimeout(()=>el.classList.remove('active'), 350); }
-
-function normKey(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'')}
-function pickColumn(rows, candidates, {fallbackNumeric=false}={}){
-  if(!rows.length) return null;
-  const m={}; for(const k of Object.keys(rows[0])) m[normKey(k)] = k;
-  for(const c of candidates){ const k=m[normKey(c)]; if(k) return k; }
-  if(fallbackNumeric){
-    for(const k of Object.keys(rows[0])){
-      const vals = rows.slice(0,30).map(r=>toNumber(r[k])).filter(v=>v!=null);
-      if(vals.length>=15) return k;
-    }
-  }
+function pickColumn(rows, opts, {fallbackNumeric=false}={}){
+  if(!rows||!rows.length) return null; const map={}; Object.keys(rows[0]).forEach(k=>map[normKey(k)]=k);
+  for(const o of opts){ const nk=normKey(o); if(nk in map) return map[nk]; }
+  if(fallbackNumeric){ for(const c of Object.keys(rows[0])){ const vals=rows.slice(0,Math.min(30,rows.length)).map(r=>toNumber(r[c]));
+    if(vals.filter(v=>v!==null).length >= Math.ceil(vals.length*0.6)) return c; } }
   return null;
 }
-function toNumber(v){
-  if(v==null) return null;
-  if(typeof v==='number' && Number.isFinite(v)) return v;
-  let s = String(v).trim(); if(!s) return null;
-  s = s.replace(/(?<=\d)[,\s](?=\d)/g,''); // 12,345 or 12 345
-  const pct = /%$/.test(s); s = s.replace(/%$/,'');
-  const n = +s; if(!Number.isFinite(n)) return null;
-  return pct ? n/100 : n;
-}
-function toDate(v){
-  if(v==null) return null;
-  if(v instanceof Date && !isNaN(v)) return v;
-  if(typeof v==='number'){
-    const ms = v>1e12? v : v>1e9? v*1000 : v;
-    const d = new Date(ms); return isNaN(d)? null : d;
-  }
-  const t = new Date(String(v)); if(!isNaN(t)) return t;
-  const t2 = new Date(String(v).replace(/-/g,'/')); return isNaN(t2)? null : t2;
-}
-function readCSV(file, cb){
-  Papa.parse(file, {
-    header:true, skipEmptyLines:true,
-    complete: res => {
-      if(res.errors?.length) status('CSV warnings: '+res.errors[0].message, true);
-      cb(res.data);
-    },
-    error: err => status('CSV parse error: '+err, true)
-  });
-}
+function readCSV(file, cb){ Papa.parse(file,{header:true, skipEmptyLines:true, dynamicTyping:false,
+  complete:res=>{ if(res.errors?.length) setStatus('CSV warnings: '+res.errors[0].message, true);
+    else setStatus(`Loaded ${file.name} (${res.data.length} rows)`); cb(res.data); },
+  error:err=>setStatus('CSV parse error: '+err, true)}); }
+
 function baseLayout(title, extra={}){
   return Object.assign({
     title:{text:title, x:0.02, xanchor:'left', font:{size:16}},
-    margin:{t:56,r:30,b:60,l:70},
-    xaxis:{automargin:true, tickfont:{size:11}, titlefont:{size:12}},
-    yaxis:{automargin:true, tickfont:{size:11}, titlefont:{size:12}},
-    hoverlabel:{font:{size:11}}
+    margin:{t:56, r:30, b:56, l:64},
+    xaxis:{title:{text:''}, automargin:true, tickfont:{size:11}},
+    yaxis:{title:{text:''}, automargin:true, tickfont:{size:11}},
+    legend:{orientation:'h', x:0, y:1.12}
   }, extra);
 }
 function polarLayout(title, extra={}){
+  // hour labels 0–23 instead of degrees
+  const labels = Array.from({length:24},(_,i)=> (i%24).toString().padStart(2,'0')+'h');
   return Object.assign({
     title:{text:title, x:0.02, xanchor:'left', font:{size:16}},
-    margin:{t:56,r:30,b:40,l:30},
+    margin:{t:56, r:30, b:40, l:30},
     polar:{
-      angularaxis:{direction:'clockwise', tickfont:{size:11}},
-      radialaxis:{tickfont:{size:11}, ticks:'outside'}
+      angularaxis:{ tickmode:'array', tickvals: Array.from({length:24},(_,i)=> i*(360/24)), ticktext: labels, direction:'clockwise' },
+      radialaxis:{ ticks:'outside', tickfont:{size:11}, angle:0 }
     },
-    hoverlabel:{font:{size:11}}
+    legend:{orientation:'h', x:0, y:1.12}
   }, extra);
 }
-function purgeAll(){ for(let i=1;i<=6;i++) Plotly.purge('plot'+i); }
-document.getElementById('btn-clear').onclick = ()=>{ purgeAll(); status('Cleared.'); }
-document.getElementById('btn-clear-files').onclick = ()=>{
-  ['file-hl','file-fitbit','file-trib','file-mites'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
-  status('Cleared chosen files. (Nothing uploaded.)');
+function diagLine(x,y){ const lo=Math.min(...x,...y), hi=Math.max(...x,...y); return {x:[lo,hi], y:[lo,hi], mode:'lines', line:{dash:'dot'}, hoverinfo:'skip', showlegend:false}; }
+function clearPlots(){ for(let i=1;i<=6;i++) Plotly.purge('plot'+i); setStatus('Cleared plots.'); }
+function clearFiles(){ ['file-hl','file-fitbit','file-trib','file-mites'].forEach(id=>{const el=byId(id); if(el) el.value='';}); setStatus('Cleared chosen files.');}
+function setCols(n){ const g=byId('grid'); g.classList.remove('cols1','cols2','cols3'); g.classList.add('cols'+n); }
+['view-1','view-2','view-3'].forEach((id,i)=> byId(id).onclick=()=>{ setCols(i+1); ['view-1','view-2','view-3'].forEach(v=>byId(v).classList.remove('active')); byId(id).classList.add('active');});
+setCols(3); // default 3-up
+
+function makeFullscreenable(id){ const el=byId(id); el.addEventListener('dblclick', ()=> {
+  const wrap=document.createElement('div'); wrap.className='fs-wrap';
+  wrap.innerHTML=`<button class="fs-close">Close (Esc)</button><div class="fs-inner"><div id="fsplot"></div></div>`;
+  document.body.appendChild(wrap);
+  const data = JSON.parse(JSON.stringify((el)._fullLayout? el.data : el.data || []));
+  const layout = JSON.parse(JSON.stringify((el)._fullLayout? el.layout : el.layout || {}));
+  Plotly.newPlot('fsplot', data, layout, {responsive:true, displaylogo:false});
+  function close(){ document.removeEventListener('keydown', esc); wrap.remove(); }
+  function esc(e){ if(e.key==='Escape') close(); }
+  wrap.querySelector('.fs-close').onclick=close; document.addEventListener('keydown', esc);
+});}
+for(let i=1;i<=6;i++) makeFullscreenable('plot'+i);
+
+function lsFit(x,y){ const n=x.length, sx=x.reduce((a,b)=>a+b,0), sy=y.reduce((a,b)=>a+b,0);
+  const sxx=x.reduce((a,b)=>a+b*b,0), sxy=x.reduce((a,b,i)=>a+b*y[i],0);
+  const b=(n*sxy - sx*sy)/(n*sxx - sx*sx); const a=(sy - b*sx)/n;
+  const yhat=x.map(v=>a+b*v); const ssres=y.reduce((s,v,i)=>s+(v-yhat[i])**2,0), sstot=y.reduce((s,v)=>s+(v - sy/n)**2,0);
+  return {a,b,r2: (1-ssres/sstot)};
 }
 
-/* ===== Quick XY ===== */
-function parseSeries(t){ if(!t) return []; return t.replace(/[;,\t\r\n]+/g,' ').trim().split(/\s+/).map(toNumber).filter(v=>v!=null); }
-document.getElementById('btn-scatter').onclick = function(){
-  const xs=parseSeries(document.getElementById('xvals').value);
-  const ys=parseSeries(document.getElementById('yvals').value);
-  if(xs.length!==ys.length || xs.length<2) return status('X and Y must be same length (≥2).', true);
-  Plotly.newPlot('plot1',[{x:xs,y:ys,mode:'markers'}],
-    baseLayout('Custom Scatter',{xaxis:{title:'X'},yaxis:{title:'Y'}}), cfg);
-  status('Rendered custom scatter.');
-}
-document.getElementById('btn-line').onclick = function(){
-  const xs=parseSeries(document.getElementById('xvals').value);
-  const ys=parseSeries(document.getElementById('yvals').value);
-  if(xs.length!==ys.length || xs.length<2) return status('X and Y must be same length (≥2).', true);
-  Plotly.newPlot('plot1',[{x:xs,y:ys,mode:'lines+markers'}],
-    baseLayout('Custom Connected Line',{xaxis:{title:'X'},yaxis:{title:'Y'}}), cfg);
-  status('Rendered custom line.');
-}
+/* ------------------------- Quick X/Y ------------------------- */
+byId('btn-scatter').onclick = function(){
+  flash(this);
+  const xs=parseSeries(byId('xvals').value), ys=parseSeries(byId('yvals').value);
+  if(xs.length!==ys.length || xs.length<2) return setStatus('X and Y must be same length (≥2).', true);
+  Plotly.newPlot('plot1', [{x:xs,y:ys,mode:'markers',type:'scatter'}],
+    baseLayout('Custom Scatter', {xaxis:{title:{text:'X'}}, yaxis:{title:{text:'Y'}}}), config);
+  setStatus('Rendered scatter.');
+};
+byId('btn-line').onclick = function(){
+  flash(this);
+  const xs=parseSeries(byId('xvals').value), ys=parseSeries(byId('yvals').value);
+  if(xs.length!==ys.length || xs.length<2) return setStatus('X and Y must be same length (≥2).', true);
+  Plotly.newPlot('plot1', [{x:xs,y:ys,mode:'lines+markers',type:'scatter'}],
+    baseLayout('Connected Line', {xaxis:{title:{text:'X'}}, yaxis:{title:{text:'Y'}}}), config);
+  setStatus('Rendered line.');
+};
 
-/* ===== Hare–Lynx (phase plane + returns) ===== */
-document.getElementById('btn-make-lynx').onclick = function(){
-  const f = document.getElementById('file-hl').files[0];
-  if(!f) return status('Upload a Hare–Lynx CSV first.', true);
+/* ------------------------- Hare–Lynx ------------------------- */
+byId('btn-make-lynx').onclick = function(){
+  flash(this);
+  const f=byId('file-hl').files[0]; if(!f) return setStatus('Upload a hare–lynx CSV first.', true);
   readCSV(f, rows=>{
-    const cY = pickColumn(rows, ['Year','year','date','yr'], {fallbackNumeric:true});
-    const cH = pickColumn(rows, ['Hare','hare','prey','hares'], {fallbackNumeric:true});
-    const cL = pickColumn(rows, ['Lynx','lynx','predator'], {fallbackNumeric:true});
-    if(!cY||!cH||!cL) return status('Missing Year/Hare/Lynx columns.', true);
-
-    // sort by time, clean
-    let T = rows.map(r=>({y:toNumber(r[cY]), h:toNumber(r[cH]), l:toNumber(r[cL])}))
-                .filter(r=>r.y!=null && r.h!=null && r.l!=null)
-                .sort((a,b)=>a.y-b.y);
-    if(T.length<3) return status('Need ≥3 rows.', true);
-
+    const cY=pickColumn(rows,['Year','date','yr'],{fallbackNumeric:true});
+    const cH=pickColumn(rows,['Hare','hare','prey'],{fallbackNumeric:true});
+    const cL=pickColumn(rows,['Lynx','lynx','predator'],{fallbackNumeric:true});
+    if(!cY||!cH||!cL) return setStatus('Couldn’t find Year/Hare/Lynx columns.', true);
+    let T=rows.map(r=>({y:toNumber(r[cY]), h:toNumber(r[cH]), l:toNumber(r[cL])}))
+              .filter(r=>r.y!==null&&r.h!==null&&r.l!==null).sort((a,b)=>a.y-b.y);
+    if(T.length<3) return setStatus('Need ≥3 rows.', true);
     const year=T.map(r=>r.y), hare=T.map(r=>r.h), lynx=T.map(r=>r.l);
-    const idx = year.map((_,i)=>i);
+    const idx=year.map((_,i)=>i);
+    const phaseLine={x:hare,y:lynx,mode:'lines',line:{width:1.6},name:'path'};
+    const phasePts={x:hare,y:lynx,mode:'markers',marker:{size:6,color:idx,colorscale:'Blues',colorbar:{title:'order',x:1.12}},name:'time'};
+    const phLayout=baseLayout('Phase Plane: Hare vs Lynx',{xaxis:{title:{text:'Hare(t)'},tickformat:',~s',type:'linear'}, yaxis:{title:{text:'Lynx(t)'},tickformat:',~s',type:'linear'}});
+    Plotly.newPlot('plot2',[phaseLine,phasePts],phLayout,config);
 
-    // phase plane
-    const line={x:hare,y:lynx,mode:'lines',line:{width:1.8},name:'path'};
-    const showPts = document.getElementById('opt-timepts').checked;
-    const pts = showPts? {x:hare,y:lynx,mode:'markers',marker:{size:6,color:idx,colorscale:'Blues',colorbar:{title:'order',x:1.08}},name:'time'} : null;
-
-    const xMax = Math.max(...hare), yMax=Math.max(...lynx);
-    const lay = baseLayout('Phase Plane: Hare vs Lynx', {
-      xaxis:{title:'Hare(t)', tickformat:',~s', range:[0, xMax*1.05]},
-      yaxis:{title:'Lynx(t)', tickformat:',~s', range:[0, yMax*1.05]}
-    });
-    Plotly.newPlot('plot2', pts? [line,pts] : [line], lay, cfg);
-
-    // returns
-    const h0=hare.slice(0,-1), h1=hare.slice(1);
-    const l0=lynx.slice(0,-1), l1=lynx.slice(1);
-    const diag=(x,y)=>({x:[Math.min(...x,...y), Math.max(...x,...y)], y:[Math.min(...x,...y), Math.max(...x,...y)], mode:'lines',line:{dash:'dot'},hoverinfo:'skip',showlegend:false});
-
-    Plotly.newPlot('plot3',
-      [{x:h0,y:h1,mode:'markers',name:'Hare'}, diag(h0,h1)],
-      baseLayout('Return: Hare(t) → Hare(t+1)',{
-        xaxis:{title:'Hare(t)', tickformat:',~s'},
-        yaxis:{title:'Hare(t+1)', tickformat:',~s'}
-      }), cfg);
-
-    Plotly.newPlot('plot4',
-      [{x:l0,y:l1,mode:'markers',name:'Lynx'}, diag(l0,l1)],
-      baseLayout('Return: Lynx(t) → Lynx(t+1)',{
-        xaxis:{title:'Lynx(t)', tickformat:',~s'},
-        yaxis:{title:'Lynx(t+1)', tickformat:',~s'}
-      }), cfg);
-
-    status('Hare–Lynx phase plane and returns rendered.');
-  });
-}
-
-/* ===== Fitbit: Nightingale Rose (24h) + Radar (DOW) ===== */
-document.getElementById('btn-make-fitbit').onclick = function(){
-  const f = document.getElementById('file-fitbit').files[0];
-  if(!f) return status('Upload a Fitbit/time CSV first.', true);
-  readCSV(f, rows=>{
-    const cT = pickColumn(rows, ['timestamp','time','datetime','date','ActivityMinute']);
-    const cS = pickColumn(rows, ['steps','value','count','activity','Steps'], {fallbackNumeric:true});
-    if(!cT||!cS) return status('Couldn’t find time & steps columns.', true);
-
-    const byHour = new Array(24).fill(0);
-    const daySum = new Array(7).fill(0), dayN=new Array(7).fill(0);
-
-    let n=0;
-    for(const r of rows){
-      const d = toDate(r[cT]); const s = toNumber(r[cS]);
-      if(!d || s==null) continue;
-      n++;
-      const h = d.getHours(); byHour[h]+=s;
-      const dow = (d.getDay()+6)%7; daySum[dow]+=s; dayN[dow]++;
+    function retPlot(x,y,title,div){
+      const x0=x.slice(0,-1), y1=x.slice(1);
+      const {a,b,r2}=lsFit(x0,y1); const fitY=x0.map(v=>a+b*v);
+      Plotly.newPlot(div,[{x:x0,y:y1,mode:'markers',name:title}, diagLine(x0,y1),
+        {x:x0,y:fitY,mode:'lines',name:'LS fit',line:{width:2}}],
+        baseLayout(`${title} (R²=${r2.toFixed(2)})`, {xaxis:{title:{text:title.split('→')[0].trim()},tickformat:',~s'}, yaxis:{title:{text:title.split('→')[1].trim()},tickformat:',~s'}}), config);
     }
-    if(!n) return status('No valid rows.', true);
-
-    // Nightingale rose with 24 hour sectors centered; ticks show hours (every 3h)
-    const theta = [...Array(24)].map((_,h)=> h*15 + 7.5); // degrees
-    const rose = {type:'barpolar', r:byHour, theta, width:new Array(24).fill(360/24), name:'steps'};
-    Plotly.newPlot('plot5', [rose],
-      polarLayout('Nightingale Rose: Steps by Hour', {
-        polar:{
-          angularaxis:{
-            tickmode:'array',
-            tickvals:[0,45,90,135,180,225,270,315],
-            ticktext:['0','3','6','9','12','15','18','21'],
-            rotation:90, direction:'clockwise'
-          },
-          radialaxis:{ticks:'outside'}
-        }
-      }), cfg);
-
-    const means = daySum.map((s,i)=> dayN[i]? s/dayN[i] : 0);
-    const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    Plotly.newPlot('plot6',
-      [{type:'scatterpolar',r:means.concat([means[0]]),theta:labels.concat([labels[0]]),
-        mode:'lines+markers',fill:'toself'}],
-      polarLayout('Radar: Mean Steps by Day of Week'), cfg);
-
-    status('Fitbit rose/radar rendered (24-hour ticks).');
+    retPlot(hare, hare, 'Return: Hare(t) → Hare(t+1)','plot3');
+    retPlot(lynx, lynx, 'Return: Lynx(t) → Lynx(t+1)','plot4');
+    setStatus('Rendered Hare–Lynx phase & returns.');
   });
-}
+};
+byId('btn-clear-hl').onclick = ()=>{ Plotly.purge('plot2'); Plotly.purge('plot3'); Plotly.purge('plot4'); };
 
-/* ===== Tribolium: cobweb with quadratic + Ricker map fits ===== */
-document.getElementById('btn-make-trib').onclick = function(){
-  const f = document.getElementById('file-trib').files[0];
-  if(!f) return status('Upload a Tribolium CSV first.', true);
+/* ------------------------- Fitbit Rose & Radar (24h) ------------------------- */
+byId('btn-make-fitbit').onclick=function(){
+  flash(this);
+  const f=byId('file-fitbit').files[0]; if(!f) return setStatus('Upload a Fitbit/time CSV first.', true);
   readCSV(f, rows=>{
-    const cT = pickColumn(rows, ['t','time','step','index'], {fallbackNumeric:true});
-    const cV = pickColumn(rows, ['adults','count','population','value','n'], {fallbackNumeric:true});
-    if(!cT||!cV) return status('Couldn’t find time & Adults/value columns.', true);
+    const cT=pickColumn(rows,['timestamp','time','datetime','ActivityMinute'],{fallbackNumeric:false});
+    const cS=pickColumn(rows,['steps','value','count','Steps'],{fallbackNumeric:true});
+    if(!cT||!cS) return setStatus('Couldn’t find time & steps columns.', true);
+    const byHour=Array(24).fill(0), dSum=Array(7).fill(0), dN=Array(7).fill(0);
+    let ok=0;
+    for(const r of rows){
+      const d=toDate(r[cT]); const s=toNumber(r[cS]);
+      if(!d||s===null) continue; ok++;
+      byHour[d.getHours()] += s;
+      const dow = (d.getDay()+6)%7; dSum[dow]+=s; dN[dow]+=1;
+    }
+    if(!ok) return setStatus('No valid rows.', true);
+    // Nightingale: 24 wedges, labeled hours
+    const theta = Array.from({length:24},(_,i)=> i*(360/24) + (360/48));
+    Plotly.newPlot('plot5', [{type:'barpolar', r:byHour, theta:theta, width: new Array(24).fill(360/24)}],
+      polarLayout('Nightingale Rose: Value by Hour'), config);
+    // Radar: mean share by weekday
+    const means = dSum.map((s,i)=> dN[i]? s/dN[i] : 0);
+    const day = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    Plotly.newPlot('plot6', [{type:'scatterpolar', r:means.concat([means[0]]), theta:day.concat([day[0]]), mode:'lines+markers', fill:'toself'}],
+      polarLayout('Radar: Mean Steps by Day of Week'), config);
+    setStatus('Rendered Nightingale (24h) & Radar.');
+  });
+};
+byId('btn-clear-fitbit').onclick=()=>{ Plotly.purge('plot5'); Plotly.purge('plot6'); };
 
-    const series = rows.map(r=>toNumber(r[cV])).filter(v=>v!=null);
-    if(series.length<6) return status('Need ≥6 numeric rows.', true);
-    const x = series.slice(0,-1), y = series.slice(1);
-
-    // quadratic LS on y = a + b x + c x^2
-    const n=x.length; let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
-    for(let i=0;i<n;i++){const xi=x[i], yi=y[i], x2=xi*xi; Sx+=xi; Sx2+=x2; Sx3+=x2*xi; Sx4+=x2*x2; Sy+=yi; Sxy+=xi*yi; Sx2y+=x2*yi;}
-    function solve3(A,B){const M=A.map((r,i)=>r.concat([B[i]]));const m=3;
-      for(let k=0;k<m;k++){let p=k;for(let i=k+1;i<m;i++) if(Math.abs(M[i][k])>Math.abs(M[p][k])) p=i;
+/* ------------------------- Tribolium Cobweb (quadratic map) ------------------------- */
+byId('btn-make-trib').onclick=function(){
+  flash(this);
+  const f=byId('file-trib').files[0]; if(!f) return setStatus('Upload a Tribolium CSV first.', true);
+  readCSV(f, rows=>{
+    const cV=pickColumn(rows,['adults','count','population','value','n'],{fallbackNumeric:true});
+    if(!cV) return setStatus('Couldn’t find Adults/population column.', true);
+    const series = rows.map(r=>toNumber(r[cV])).filter(v=>v!==null);
+    if(series.length<4) return setStatus('Need ≥4 numeric rows.', true);
+    const x=series.slice(0,-1), y=series.slice(1), n=x.length;
+    // quadratic fit y=a + b x + c x^2
+    let Sx=0,Sx2=0,Sx3=0,Sx4=0,Sy=0,Sxy=0,Sx2y=0;
+    for(let i=0;i<n;i++){ const xi=x[i], yi=y[i], x2=xi*xi; Sx+=xi; Sx2+=x2; Sx3+=x2*xi; Sx4+=x2*x2; Sy+=yi; Sxy+=xi*yi; Sx2y+=x2*yi; }
+    function solve3(A,B){ const M=A.map((r,i)=>r.concat([B[i]])); const m=M.length;
+      for(let k=0;k<m;k++){ let p=k; for(let i=k+1;i<m;i++) if(Math.abs(M[i][k])>Math.abs(M[p][k])) p=i;
         [M[k],M[p]]=[M[p],M[k]]; const piv=M[k][k]||1e-12;
         for(let j=k;j<=m;j++) M[k][j]/=piv;
-        for(let i=0;i<m;i++) if(i!==k){const f=M[i][k]; for(let j=k;j<=m;j++) M[i][j]-=f*M[k][j];}}
-      return [M[0][m],M[1][m],M[2][m]];
+        for(let i=0;i<m;i++) if(i!==k){ const f=M[i][k]; for(let j=k;j<=m;j++) M[i][j]-=f*M[k][j]; } }
+      return M.map(r=>r[m]);
     }
-    const [a,b,c] = solve3([[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]],[Sy,Sxy,Sx2y]);
-
-    // Ricker fit y = x * exp(r*(1 - x/K))
-    // crude grid search for r,K
-    const xmin=Math.min(...x), xmax=Math.max(...x);
-    let best={r:0.2,K:xmax,err:1e99};
-    for(const r of [0.05,0.1,0.2,0.3,0.5,0.8]){
-      const Kcand = [0.5,1,1.5,2].map(f=>f*xmax);
-      for(const K of Kcand){
-        let e=0; for(let i=0;i<n;i++){const yi=x[i]*Math.exp(r*(1-x[i]/K)); e+=(yi-y[i])**2;}
-        if(e<best.err) best={r,K,err:e};
-      }
-    }
-
-    const xs = Array.from({length:400},(_,i)=> xmin+(xmax-xmin)*i/399);
-    const qfit = xs.map(v=>a+b*v+c*v*v);
-    const rfit = xs.map(v=> v*Math.exp(best.r*(1-v/best.K)));
-
+    const [a,b,c]=solve3([[n,Sx,Sx2],[Sx,Sx2,Sx3],[Sx2,Sx3,Sx4]],[Sy,Sxy,Sx2y]);
+    const xmin=Math.min(...x,...y), xmax=Math.max(...x,...y);
+    const xs=Array.from({length:400},(_,i)=> xmin+(xmax-xmin)*i/399), fx=xs.map(v=>a+b*v+c*v*v);
+    const cobweb=(x0,steps=30)=>{ let X=x0; const segs=[]; for(let i=0;i<steps;i++){ const Y=a+b*X+c*X*X; segs.push({x:[X,X],y:[X,Y]}); segs.push({x:[X,Y],y:[Y,Y]}); X=Y;} return segs; };
     const traces=[
-      {x, y, mode:'markers', name:'data'},
-      {x:xs, y:qfit, mode:'lines', name:`Quadratic`},
-      {x:xs, y:rfit, mode:'lines', line:{dash:'dash'}, name:`Ricker`}
+      {x:xs,y:fx,mode:'lines',name:'Quadratic'},
+      {x:[xmin,xmax],y:[xmin,xmax],mode:'lines',line:{dash:'dot'},hoverinfo:'skip',showlegend:false},
+      {x:x,y:y,mode:'markers',name:'data'}
     ];
-    traces.push({x:[xmin,xmax], y:[xmin,xmax], mode:'lines', line:{dash:'dot'}, hoverinfo:'skip', showlegend:false});
-
-    Plotly.newPlot('plot1', traces,
-      baseLayout('Cobweb (map fit) – Tribolium',{xaxis:{title:'x(t)'},yaxis:{title:'x(t+1)'}}), cfg);
-
-    status('Tribolium cobweb rendered.');
+    for(const s of cobweb(xmin+0.2*(xmax-xmin)).concat(cobweb(xmin+0.75*(xmax-xmin))))
+      traces.push({x:s.x,y:s.y,mode:'lines',line:{width:1},hoverinfo:'skip',showlegend:false});
+    Plotly.newPlot('plot1', traces, baseLayout('Cobweb (map fit) – Tribolium',{xaxis:{title:{text:'x(t)'}}, yaxis:{title:{text:'x(t+1)'}}}), config);
+    setStatus('Rendered cobweb diagram.');
   });
-}
+};
+byId('btn-clear-trib').onclick=()=>{ Plotly.purge('plot1'); };
 
-/* ===== Predator–Prey (Mites): phase plane + returns + LV fit overlay ===== */
-document.getElementById('btn-make-mites').onclick = function(){
-  const f = document.getElementById('file-mites').files[0];
-  if(!f) return status('Upload a predator–prey CSV (time, prey, predator).', true);
+/* ------------------------- Predator–Prey (mites) ------------------------- */
+function simulateLV(a,b,c,d,x0,y0,tmax,dt){
+  const xs=[x0], ys=[y0];
+  for(let t=0;t<tmax;t+=dt){
+    const x=xs[xs.length-1], y=ys[ys.length-1];
+    const nx=x + dt*(a*x - b*x*y);
+    const ny=y + dt*(-c*y + d*x*y);
+    if(!Number.isFinite(nx)||!Number.isFinite(ny)) break;
+    xs.push(nx); ys.push(ny);
+  }
+  return {xs,ys};
+}
+byId('btn-make-mites').onclick=function(){
+  flash(this);
+  const f=byId('file-mites').files[0]; if(!f) return setStatus('Upload a mites predator–prey CSV first.', true);
+  const useSmooth=byId('chk-smooth').checked, useLV=byId('chk-lv').checked, useLog=byId('chk-log').checked, showPts=byId('chk-timepts').checked;
   readCSV(f, rows=>{
-    const cT = pickColumn(rows, ['time','t','day','week'], {fallbackNumeric:true});
-    const cX = pickColumn(rows, ['prey','preycount','prey_n'], {fallbackNumeric:true});
-    const cY = pickColumn(rows, ['predator','pred','predcount','predator_n'], {fallbackNumeric:true});
-    if(!cT||!cX||!cY) return status('Need time / prey / predator columns.', true);
+    const cT=pickColumn(rows,['time','t','index'],{fallbackNumeric:true});
+    const cPrey=pickColumn(rows,['prey','hares','victim'],{fallbackNumeric:true});
+    const cPred=pickColumn(rows,['predator','lynx','pred'],{fallbackNumeric:true});
+    if(!cT||!cPrey||!cPred) return setStatus('Need time, prey, predator columns.', true);
+    let T=rows.map(r=>({t:toNumber(r[cT]), x:toNumber(r[cPrey]), y:toNumber(r[cPred])}))
+              .filter(r=>r.t!==null&&r.x!==null&&r.y!==null).sort((a,b)=>a.t-b.t);
+    if(T.length<6) return setStatus('Need ≥6 rows.', true);
+    const t=T.map(r=>r.t), prey=T.map(r=>r.x), pred=T.map(r=>r.y);
 
-    let T = rows.map(r=>({t:toNumber(r[cT]), x:toNumber(r[cX]), y:toNumber(r[cY])}))
-                .filter(r=>r.t!=null && r.x!=null && r.y!=null)
-                .sort((a,b)=>a.t-b.t);
-    if(T.length<6) return status('Need ≥6 rows for mites.', true);
+    // basic smoothing (moving average) for the path if toggled
+    function smooth(arr, k=3){ if(!useSmooth) return arr.slice(); const n=arr.length, out=Array(n).fill(0);
+      for(let i=0;i<n;i++){ let s=0,c=0; for(let j=i-k;j<=i+k;j++){ if(j>=0&&j<n){ s+=arr[j]; c++; } } out[i]=s/c; } return out;
+    }
+    const preyS = smooth(prey), predS = smooth(pred);
 
-    const t=T.map(r=>r.t), x=T.map(r=>r.x), y=T.map(r=>r.y);
+    // Phase plane
     const idx=t.map((_,i)=>i);
+    const phaseLine={x:preyS,y:predS,mode:'lines',line:{width:1.6},name:'path'};
+    const phasePts = showPts? {x:prey,y:pred,mode:'markers',name:'time',
+        marker:{size:6,color:idx,colorscale:'Blues',colorbar:{title:'order',x:1.12}}} : null;
 
-    // optional moving-average smooth for phase path
-    const doSmooth = document.getElementById('opt-smooth').checked;
-    function ma(arr,k=3){
-      if(!doSmooth) return arr.slice();
-      const out=[], n=arr.length;
-      for(let i=0;i<n;i++){
-        let s=0,c=0; for(let j=Math.max(0,i-k); j<=Math.min(n-1,i+k); j++){s+=arr[j];c++}
-        out.push(s/c);
-      }
-      return out;
+    const xType = useLog? 'log':'linear', yType = useLog? 'log':'linear';
+    const phLayout=baseLayout('Phase Plane: Prey vs Predator',{xaxis:{title:{text:'Prey(t)'}, type:xType, tickformat:',~s'},
+                                                                yaxis:{title:{text:'Predator(t)'}, type:yType, tickformat:',~s'}});
+    const traces=[phaseLine]; if(phasePts) traces.push(phasePts);
+
+    // LV overlay (fit & clip to bounds)
+    if(useLV){
+      // crude parameter guess from means (positive orbit near center)
+      const xbar = prey.reduce((a,b)=>a+b,0)/prey.length;
+      const ybar = pred.reduce((a,b)=>a+b,0)/pred.length;
+      // Guess relationships: a≈ybar, c≈xbar, b≈a/(xbar), d≈c/(ybar) — just to create a stable orbit near data
+      let a = Math.max(1e-6, ybar/xbar), b = a/Math.max(1e-6,xbar), c = Math.max(1e-6, xbar/ybar), d = c/Math.max(1e-6,ybar);
+      const xmin=Math.min(...prey), xmax=Math.max(...prey), ymin=Math.min(...pred), ymax=Math.max(...pred);
+      const {xs,ys} = simulateLV(a,b,c,d, prey[0], pred[0], t.length, 0.05);
+      const clipX=[], clipY=[];
+      for(let i=0;i<xs.length;i++){ const X=xs[i], Y=ys[i]; if(X>=xmin&&X<=xmax&&Y>=ymin&&Y<=ymax){ clipX.push(X); clipY.push(Y); } }
+      if(clipX.length>2) traces.push({x:clipX,y:clipY,mode:'lines',name:'LV orbit (fit)',line:{dash:'dot'}});
     }
-    const xs = ma(x,2), ys = ma(y,2);
+    Plotly.newPlot('plot2', traces, phLayout, config);
 
-    // phase plane
-    const line = {x:xs,y:ys,mode:'lines',name:'path'};
-    const showPts=document.getElementById('opt-timepts').checked;
-    const pts = showPts? {x:xs,y:ys,mode:'markers',marker:{size:6,color:idx,colorscale:'Blues',colorbar:{title:'order',x:1.08}},name:'time'} : null;
-
-    // ranges (optionally log)
-    const log = document.getElementById('opt-log').checked;
-    const xMax=Math.max(...x), yMax=Math.max(...y);
-    const layPP = baseLayout('Phase Plane: Prey vs Predator'+(document.getElementById('opt-lvfit').checked?'  (LV overlay)':''),{
-      xaxis:{title:'Prey(t)', tickformat:',~s', range: log? undefined : [0,xMax*1.05], type: log? 'log':'linear'},
-      yaxis:{title:'Predator(t)', tickformat:',~s', range: log? undefined : [0,yMax*1.05], type: log? 'log':'linear'}
-    });
-
-    const series = pts? [line,pts] : [line];
-
-    // LV parameter fit (dx= ax - bxy, dy= -cy + dxy) via least-squares on finite differences
-    if(document.getElementById('opt-lvfit').checked && x.length>5){
-      const dt = t[1]-t[0] || 1;
-      const dx = x.slice(1).map((v,i)=>(v-x[i])/dt);
-      const dy = y.slice(1).map((v,i)=>(v-y[i])/dt);
-      const X = x.slice(0,-1), Y = y.slice(0,-1);
-      // Solve [x, -x*y] [a, b]^T = dx ;  [y, -x*y] [-c, d]^T = dy
-      function ls2(A1,A2,B){
-        // normal equations
-        let s11=0,s12=0,s22=0, b1=0,b2=0;
-        for(let i=0;i<B.length;i++){const a=A1[i], c=A2[i]; s11+=a*a; s12+=a*c; s22+=c*c; b1+=a*B[i]; b2+=c*B[i];}
-        const det = s11*s22 - s12*s12 || 1e-9;
-        const p1 = ( b1*s22 - b2*s12)/det;
-        const p2 = (-b1*s12 + b2*s11)/det;
-        return [p1,p2];
-      }
-      const [a, b]   = ls2(X, X.map((v,i)=>v*Y[i]), dx).map((v,i)=> i? Math.max(v,1e-9) : v); // b >= 0
-      const [negc, d]= ls2(Y, X.map((v,i)=>v*Y[i]), dy);
-      const c = -negc;
-
-      // simulate ODE from median point to draw a smooth orbit (not a fit line!)
-      const xm = x[Math.floor(x.length/2)], ym = y[Math.floor(y.length/2)];
-      const dtSim=0.02, steps=3000;
-      let px=[xm], py=[ym]; let Xs=xm, Ys=ym;
-      for(let i=0;i<steps;i++){
-        const k1x = a*Xs - b*Xs*Ys;
-        const k1y = -c*Ys + d*Xs*Ys;
-        const nx = Xs + k1x*dtSim;
-        const ny = Ys + k1y*dtSim;
-        Xs=nx; Ys=ny;
-        if(!Number.isFinite(Xs)||!Number.isFinite(Ys)) break;
-        px.push(Xs); py.push(Ys);
-      }
-      series.push({x:px,y:py,mode:'lines',line:{dash:'dot'},name:'LV orbit (fit)'});
+    // Return maps
+    function retPlot(arr,title,div){
+      const x0=arr.slice(0,-1), y1=arr.slice(1);
+      const {a,b,r2}=lsFit(x0,y1); const fit=x0.map(v=>a+b*v);
+      Plotly.newPlot(div,[{x:x0,y:y1,mode:'markers',name:'Return'}, diagLine(x0,y1),
+        {x:x0,y:fit,mode:'lines',name:'LS fit',line:{width:2}}],
+        baseLayout(`${title} (R²=${r2.toFixed(2)})`, {xaxis:{title:{text:title.split('→')[0].trim()}, type:xType, tickformat:',~s'},
+                                                      yaxis:{title:{text:title.split('→')[1].trim()}, type:yType, tickformat:',~s'}}), config);
     }
-
-    Plotly.newPlot('plot5', series, layPP, cfg);
-
-    // Return maps with 1:1 line
-    function retPlot(xarr, title, id){
-      const x0=xarr.slice(0,-1), x1=xarr.slice(1);
-      Plotly.newPlot(id,
-        [{x:x0,y:x1,mode:'markers',name:'Return'},
-         {x:[Math.min(...x0,...x1), Math.max(...x0,...x1)],
-          y:[Math.min(...x0,...x1), Math.max(...x0,...x1)],
-          mode:'lines', line:{dash:'dot'}, hoverinfo:'skip', showlegend:false}],
-        baseLayout(title,{xaxis:{title:title.includes('Prey')?'Prey(t)':'Predator(t)', tickformat:',~s'},
-                          yaxis:{title:title.includes('Prey')?'Prey(t+1)':'Predator(t+1)', tickformat:',~s'}}), cfg);
-    }
-    retPlot(x,'Return: Prey(t) → Prey(t+1)','plot3');
-    retPlot(y,'Return: Predator(t) → Predator(t+1)','plot4');
-
-    status('Predator–prey phase plane & returns rendered.');
+    retPlot(prey,'Return: Prey(t) → Prey(t+1)','plot3');
+    retPlot(pred,'Return: Predator(t) → Predator(t+1)','plot4');
+    setStatus('Rendered predator–prey phase & returns (with safe LV overlay).');
   });
-}
+};
+byId('btn-clear-mites').onclick=()=>{ Plotly.purge('plot2'); Plotly.purge('plot3'); Plotly.purge('plot4'); };
 
-/* fullscreen on double-click */
-for(let i=1;i<=6;i++){
-  const id='plot'+i;
-  document.getElementById(id).addEventListener('dblclick', ()=>{
-    const s = document.getElementById(id);
-    const data = s.data? JSON.parse(JSON.stringify(s.data)):[];
-    const lay  = s.layout? JSON.parse(JSON.stringify(s.layout)):{};
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(11,12,16,.98);display:grid;place-items:center;padding:10px';
-    wrap.innerHTML = `<button id="fs-close" style="position:fixed;top:10px;right:12px" class="muted">Close (Esc)</button>
-                      <div id="fs-plot" style="width:min(1200px,95vw);height:min(90vh,900px)"></div>`;
-    document.body.appendChild(wrap);
-    Plotly.newPlot('fs-plot', data, lay, {responsive:true,displaylogo:false});
-    function close(){document.removeEventListener('keydown', esc); wrap.remove();}
-    function esc(e){ if(e.key==='Escape') close(); }
-    document.getElementById('fs-close').onclick = close;
-    document.addEventListener('keydown', esc);
-  });
-}
+/* ------------------------- global clears ------------------------- */
+byId('btn-clear-plots').onclick=()=>{ flash(byId('btn-clear-plots')); clearPlots(); };
+byId('btn-clear-files').onclick=()=>{ flash(byId('btn-clear-files')); clearFiles(); };
 </script>
 </body>
 </html>
+
